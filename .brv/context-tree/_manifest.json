@@ -1,0 +1,61 @@
+{
+  "active_context": [
+    {
+      "importance": 80,
+      "path": "bug-fixes/context.md",
+      "tokens": 420,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/context.md",
+      "tokens": 317,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/routing-integration/context.md",
+      "tokens": 387,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/routing-integration/route_safety.md",
+      "tokens": 1024,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/ssi-algorithm/context.md",
+      "tokens": 304,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/ssi-algorithm/hazard_detection.md",
+      "tokens": 574,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/ssi-algorithm/ssi_calculation.md",
+      "tokens": 1026,
+      "type": "context"
+    },
+    {
+      "importance": 50,
+      "path": "safety-engine/weather-integration/context.md",
+      "tokens": 319,
+      "type": "context"
+    }
+  ],
+  "generated_at": "2026-04-22T19:00:00Z",
+  "lane_tokens": {
+    "contexts": 3951,
+    "stubs": 0,
+    "summaries": 0
+  },
+  "source_fingerprint": "b4d09696b17e116b9471f5b22930c74d1200f1bf973909863516e5292d1098a8",
+  "total_tokens": 3951,
+  "version": 1
+}

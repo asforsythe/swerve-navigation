@@ -1,0 +1,60 @@
+/*
+ * Swerve Design Tokens
+ * Single source of truth for all design values.
+ * Import this file first in index.css.
+ */
+:root {
+  /* ── Colors ────────────────────────────────────────────────────────── */
+  --c-primary:  #f43f5e;              /* rose-500   — actions, alerts       */
+  --c-safe:     #22d3ee;              /* cyan-400   — safe routes, scanner  */
+  --c-optimal:  #34d399;              /* emerald-400 — SSI high             */
+  --c-caution:  #fbbf24;              /* amber-400  — SSI mid               */
+  --c-critical: #ef4444;              /* red-500    — SSI low, hazards      */
+  --c-info:     #60a5fa;              /* blue-400   — radar, info           */
+  --c-violet:   #a78bfa;              /* violet-400 — research panels       */
+  --c-gold:     #fcd34d;              /* amber-300  — streaks, scores       */
+  --c-surface:  #0a0a0e;              /* glass panel background             */
+  --c-border:   rgba(255,255,255,0.08);
+  --c-text:     rgba(255,255,255,0.90);
+  --c-muted:    rgba(255,255,255,0.40);
+
+  /* SSI color stops referenced by JS via CSS var reads */
+  --ssi-color-high: var(--c-optimal);  /* SSI > 80  */
+  --ssi-color-mid:  var(--c-caution);  /* SSI 50-80 */
+  --ssi-color-low:  var(--c-critical); /* SSI < 50  */
+
+  /* ── Glows / Shadows ───────────────────────────────────────────────── */
+  --shadow-glass:    0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  --shadow-glass-lg: 0 12px 48px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.08);
+  --glow-cyan:    0 0 20px rgba(34,  211, 238, 0.50);
+  --glow-rose:    0 0 20px rgba(244,  63,  94, 0.50);
+  --glow-emerald: 0 0 20px rgba(52,  211, 153, 0.50);
+  --glow-amber:   0 0 20px rgba(251, 191,  36, 0.50);
+  --glow-violet:  0 0 20px rgba(167, 139, 250, 0.50);
+
+  /* ── Timing ────────────────────────────────────────────────────────── */
+  --t-fast:    150ms;
+  --t-std:     300ms;
+  --t-slow:    600ms;
+  --t-ambient: 5s;
+
+  /* ── Easing ────────────────────────────────────────────────────────── */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-std:    cubic-bezier(0.4,  0, 0.2, 1);
+  --ease-out:    cubic-bezier(0,    0, 0.2, 1);
+
+  /* ── Orbit radii (TelemetryPanel CSS var, override per particle) ───── */
+  --orbit-r-sm: 48px;
+  --orbit-r-md: 62px;
+  --orbit-r-lg: 76px;
+
+  /* ── Z-index layers ─────────────────────────────────────────────────── */
+  --z-map:     0;
+  --z-weather: 11;
+  --z-route:   21;
+  --z-markers: 31;
+  --z-panels:  41;
+  --z-modals:  51;
+  --z-toasts:  61;
+  --z-fx:      71;
+}
