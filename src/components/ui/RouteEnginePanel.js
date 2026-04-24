@@ -1,4 +1,7 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { slideLeft } from '../../design/motion';
+import useSwerveStore from '../../store/useSwerveStore';
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
 const LocationIcon = () => (
@@ -85,8 +88,23 @@ const RouteEnginePanel = ({
     modeEtas,
     travelMode,
     setTravelMode,
+    predictive,
+    routeMode,
+    setRouteMode,
 }) => {
+    const { routeTelemetry } = useSwerveStore();
+    const isAdventure = routeMode === 'adventure';
     const hasEtas = modeEtas && (modeEtas.driving !== null || modeEtas.cycling !== null || modeEtas.walking !== null);
+    const [showOptimizer, setShowOptimizer] = useState(false);
+
+    const { results: predResults, isLoading: predLoading, error: predError,
+            selectedOffset, setSelectedOffset, run: runPredictive,
+            centerLat: predCenterLat, centerLng: predCenterLng } = predictive || {};
+
+    const goldenCount = useMemo(
+        () => (predResults || []).filter(r => r.isGolden).length,
+        [predResults]
+    );
 
     const MODES = [
         { key: 'driving', label: 'Drive', Icon: DriveIcon, activeClass: 'bg-rose-500 text-white' },
@@ -173,7 +191,12 @@ const RouteEnginePanel = ({
     };
 
     return (
-        <div className="absolute bottom-6 right-6 z-40 w-80 p-5 rounded-[24px] glass-panel animate-slide-in-right">
+        <motion.div
+            className="absolute bottom-6 right-6 z-40 w-80 p-5 rounded-[24px] glass-panel"
+            variants={slideLeft}
+            initial="hidden"
+            animate="visible"
+        >
             {/* Header */}
             <div className="flex items-center gap-2 mb-4">
                 <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -222,24 +245,62 @@ const RouteEnginePanel = ({
                     {renderSuggestions('dest')}
                 </div>
 
+                {/* Safe / Adventure mode toggle */}
+                <div className="flex rounded-xl overflow-hidden border border-white/[0.08] mt-1">
+                    <button
+                        onClick={() => setRouteMode?.('safe')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
+                            !isAdventure
+                                ? 'bg-rose-500/90 text-white shadow-inner'
+                                : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08] hover:text-white/60'
+                        }`}
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Safe
+                    </button>
+                    <div className="w-px bg-white/[0.08]" />
+                    <button
+                        onClick={() => setRouteMode?.('adventure')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
+                            isAdventure
+                                ? 'text-amber-300'
+                                : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08] hover:text-white/60'
+                        }`}
+                        style={isAdventure ? {
+                            background: 'linear-gradient(135deg, rgba(217,119,6,0.4), rgba(249,115,22,0.35))',
+                            boxShadow: 'inset 0 1px 0 rgba(255,200,100,0.15)',
+                        } : undefined}
+                    >
+                        <span className="text-base leading-none">🔥</span>
+                        Adventure
+                    </button>
+                </div>
+
                 {/* Liquid glass plan button */}
-                <button
+                <motion.button
                     onClick={handlePlanClick}
                     disabled={isRouting}
-                    className={`mt-1 group relative overflow-hidden rounded-xl py-3 text-sm font-bold text-white w-full
-                        border border-rose-400/20
-                        active:scale-95 transition-all duration-200
+                    whileHover={!isRouting ? {
+                        scale: 1.02,
+                        boxShadow: isAdventure
+                            ? '0 6px 32px rgba(249,115,22,0.55), inset 0 1px 0 rgba(255,255,255,0.20)'
+                            : '0 6px 32px rgba(244,63,94,0.55), inset 0 1px 0 rgba(255,255,255,0.20)',
+                    } : {}}
+                    whileTap={!isRouting  ? { scale: 0.96 } : {}}
+                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                    className={`group relative overflow-hidden rounded-xl py-3 text-sm font-bold text-white w-full
                         focus:outline-none
-                        ${isRouting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        ${isRouting ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                        ${isAdventure ? 'border border-amber-500/20' : 'border border-rose-400/20'}`}
                     style={{
-                        background: 'linear-gradient(135deg, rgba(225,29,72,0.95), rgba(244,63,94,0.9))',
-                        boxShadow: '0 4px 20px rgba(244,63,94,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
-                    }}
-                    onMouseEnter={(e) => {
-                        if (!isRouting) e.currentTarget.style.boxShadow = '0 4px 28px rgba(244,63,94,0.55), inset 0 1px 0 rgba(255,255,255,0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(244,63,94,0.35), inset 0 1px 0 rgba(255,255,255,0.15)';
+                        background: isAdventure
+                            ? 'linear-gradient(135deg, rgba(217,119,6,0.95), rgba(249,115,22,0.9))'
+                            : 'linear-gradient(135deg, rgba(225,29,72,0.95), rgba(244,63,94,0.9))',
+                        boxShadow: isAdventure
+                            ? '0 4px 20px rgba(249,115,22,0.35), inset 0 1px 0 rgba(255,255,255,0.15)'
+                            : '0 4px 20px rgba(244,63,94,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
                     }}
                 >
                     {/* Top glint */}
@@ -259,9 +320,30 @@ const RouteEnginePanel = ({
                         />
                     )}
                     <span className="relative z-10">
-                        {isRouting ? 'Calculating Safest Path...' : 'Plan Safest Route'}
+                        {isRouting
+                            ? (isAdventure ? 'Finding Your Thrill Ride...' : 'Calculating Safest Path...')
+                            : (isAdventure ? 'Plan Adventure Route' : 'Plan Safest Route')
+                        }
                     </span>
-                </button>
+                </motion.button>
+
+                {/* Adventure Score result chip */}
+                {routeTelemetry?.isAdventureMode && routeTelemetry?.adventureScore != null && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl"
+                        style={{
+                            background: 'rgba(217,119,6,0.12)',
+                            border: '1px solid rgba(249,115,22,0.25)',
+                        }}
+                    >
+                        <span className="text-sm">🔥</span>
+                        <span className="text-amber-400 text-[11px] font-bold">
+                            AS {Math.round(routeTelemetry.adventureScore)} — {routeTelemetry.adventureCategory}
+                        </span>
+                    </motion.div>
+                )}
             </div>
 
             {/* ETA Mode Toggle */}
@@ -291,6 +373,159 @@ const RouteEnginePanel = ({
                             </button>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {/* Departure Optimizer */}
+            {predictive && (
+                <div className="pt-4 border-t border-white/[0.08]">
+                    <button
+                        onClick={() => {
+                            setShowOptimizer(v => !v);
+                            if (!showOptimizer && !predResults && runPredictive && predCenterLat) {
+                                runPredictive(predCenterLat, predCenterLng);
+                            }
+                        }}
+                        className="w-full flex items-center justify-between group"
+                    >
+                        <div className="flex items-center gap-2">
+                            <svg className="w-3.5 h-3.5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span className="text-white/80 font-medium text-[10px] tracking-wider uppercase">Departure Optimizer</span>
+                            {goldenCount > 0 && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                                    {goldenCount} golden
+                                </span>
+                            )}
+                        </div>
+                        <svg
+                            className={`w-3.5 h-3.5 text-white/30 transition-transform ${showOptimizer ? 'rotate-180' : ''}`}
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+
+                    <AnimatePresence>
+                        {showOptimizer && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="pt-3 space-y-3">
+                                    {/* Run / refresh button */}
+                                    <button
+                                        onClick={() => runPredictive?.(predCenterLat, predCenterLng)}
+                                        disabled={predLoading}
+                                        className="w-full py-2 rounded-xl text-[11px] font-semibold border border-violet-400/20 text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40"
+                                    >
+                                        {predLoading ? (
+                                            <>
+                                                <span className="w-3 h-3 border-2 border-violet-400/30 border-t-violet-400 rounded-full animate-spin" />
+                                                Analyzing 24h forecast…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                                Analyze Departure Windows
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {predError && (
+                                        <p className="text-rose-400 text-[10px] text-center">{predError}</p>
+                                    )}
+
+                                    {predResults && (
+                                        <>
+                                            {/* Bar chart sparkline */}
+                                            <div>
+                                                <p className="text-white/25 text-[9px] uppercase tracking-widest mb-2">SSI by Departure Time</p>
+                                                <div className="flex items-end gap-1 h-12">
+                                                    {predResults.map((r, i) => (
+                                                        <button
+                                                            key={r.label}
+                                                            onClick={() => setSelectedOffset?.(i)}
+                                                            className="flex-1 flex flex-col items-center gap-0.5 group/bar"
+                                                            title={`${r.label}: SSI ${r.ssi}`}
+                                                        >
+                                                            <div className="relative w-full rounded-t-sm transition-all"
+                                                                style={{
+                                                                    height: `${Math.max(4, (r.ssi / 100) * 36)}px`,
+                                                                    background: r.isGolden
+                                                                        ? `linear-gradient(to top, ${r.color}cc, ${r.color})`
+                                                                        : `${r.color}55`,
+                                                                    outline: selectedOffset === i ? `2px solid ${r.color}` : 'none',
+                                                                    outlineOffset: '1px',
+                                                                }}
+                                                            >
+                                                                {r.isGolden && (
+                                                                    <div
+                                                                        className="absolute inset-0 rounded-t-sm animate-pulse"
+                                                                        style={{ background: `${r.color}22` }}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                {/* Labels */}
+                                                <div className="flex gap-1 mt-0.5">
+                                                    {predResults.map((r, i) => (
+                                                        <button
+                                                            key={r.label}
+                                                            onClick={() => setSelectedOffset?.(i)}
+                                                            className="flex-1 text-center"
+                                                        >
+                                                            <span className={`text-[8px] ${selectedOffset === i ? 'text-white' : 'text-white/25'}`}>
+                                                                {r.label}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Selected window detail */}
+                                            {predResults[selectedOffset] && (() => {
+                                                const r = predResults[selectedOffset];
+                                                return (
+                                                    <div
+                                                        className="rounded-xl p-3 border"
+                                                        style={{
+                                                            background: r.color + '12',
+                                                            borderColor: r.color + '33',
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <p className="text-white/70 text-xs font-semibold">{r.label} departure</p>
+                                                                <p className="text-white/35 text-[10px]">{r.temp}°F · {r.precip}mm precip</p>
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <p className="font-bold text-lg" style={{ color: r.color }}>{r.ssi}</p>
+                                                                <p className="text-[9px]" style={{ color: r.color }}>{r.category}</p>
+                                                            </div>
+                                                        </div>
+                                                        {r.isGolden && (
+                                                            <p className="text-emerald-400 text-[10px] mt-1.5 flex items-center gap-1">
+                                                                <span>✦</span> Golden window — optimal conditions
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+                                        </>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             )}
 
@@ -328,7 +563,7 @@ const RouteEnginePanel = ({
                     <span>Forecast</span>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };
 

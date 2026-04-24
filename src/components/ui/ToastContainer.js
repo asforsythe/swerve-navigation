@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import useSwerveStore from '../../store/useSwerveStore';
+import { toastVariants } from '../../design/motion';
 
 const ICONS = {
     success: (
@@ -25,22 +27,21 @@ const ICONS = {
 };
 
 const TYPE_BORDER = {
-    success: 'rgba(52,211,153,0.25)',
-    error: 'rgba(244,63,94,0.25)',
-    info: 'rgba(96,165,250,0.25)',
-    warning: 'rgba(251,191,36,0.25)',
+    success: 'rgba(52,211,153,0.28)',
+    error:   'rgba(244,63,94,0.28)',
+    info:    'rgba(96,165,250,0.28)',
+    warning: 'rgba(251,191,36,0.28)',
 };
 
 const TYPE_PROGRESS = {
     success: '#34d399',
-    error: '#f43f5e',
-    info: '#60a5fa',
+    error:   '#f43f5e',
+    info:    '#60a5fa',
     warning: '#fbbf24',
 };
 
 const CONFETTI_COLORS = ['#f43f5e', '#22d3ee', '#a78bfa', '#34d399', '#fbbf24', '#f97316'];
 
-// Single confetti piece
 const ConfettiPiece = ({ color, left, delay, size }) => (
     <div
         className="absolute pointer-events-none rounded-sm animate-confetti-fall"
@@ -57,88 +58,63 @@ const ConfettiPiece = ({ color, left, delay, size }) => (
     />
 );
 
-// Individual toast component
-const Toast = ({ toast, onRemove }) => {
-    const [entered, setEntered] = useState(false);
-    const [shaking, setShaking] = useState(false);
-    const duration = toast.duration || 3000;
-    const isError = toast.type === 'error';
-    const isSuccess = toast.type === 'success';
-
-    // Stagger entrance slightly with RAF
-    useEffect(() => {
-        const id = requestAnimationFrame(() => {
-            requestAnimationFrame(() => setEntered(true));
-        });
-        return () => cancelAnimationFrame(id);
-    }, []);
-
-    // Shake on error after entrance
-    useEffect(() => {
-        if (!isError) return;
-        const id = setTimeout(() => {
-            setShaking(true);
-            setTimeout(() => setShaking(false), 600);
-        }, 300);
-        return () => clearTimeout(id);
-    }, [isError]);
+// forwardRef required: AnimatePresence mode="popLayout" passes a ref to measure
+// the element for layout animations. Plain function components crash without it.
+const Toast = React.forwardRef(({ toast, onRemove }, ref) => {
+    const duration   = toast.duration || 3000;
+    const isSuccess  = toast.type === 'success';
+    const borderColor   = TYPE_BORDER[toast.type]   ?? TYPE_BORDER.info;
+    const progressColor = TYPE_PROGRESS[toast.type] ?? TYPE_PROGRESS.info;
 
     const confetti = useMemo(() => {
         if (!isSuccess) return [];
         return Array.from({ length: 14 }, (_, i) => ({
-            id: i,
+            id:    i,
             color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            left: 5 + (i * 6.8) % 90,
+            left:  5 + (i * 6.8) % 90,
             delay: i * 0.045,
-            size: 4 + (i % 3),
+            size:  4 + (i % 3),
         }));
     }, [isSuccess]);
 
-    const borderColor = TYPE_BORDER[toast.type] || TYPE_BORDER.info;
-    const progressColor = TYPE_PROGRESS[toast.type] || TYPE_PROGRESS.info;
-
     return (
-        <div
+        <motion.div
+            ref={ref}
+            layout
+            variants={toastVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
             className="pointer-events-auto relative overflow-hidden"
-            style={{
-                opacity: entered ? 1 : 0,
-                transform: entered ? 'translateY(0) scale(1)' : 'translateY(-12px) scale(0.94)',
-                filter: entered ? 'blur(0px)' : 'blur(4px)',
-                transition: 'opacity 0.4s cubic-bezier(0.16,1,0.3,1), transform 0.4s cubic-bezier(0.16,1,0.3,1), filter 0.4s cubic-bezier(0.16,1,0.3,1)',
-                animation: shaking ? 'toastShake 0.5s cubic-bezier(0.36,0.07,0.19,0.97)' : undefined,
-            }}
         >
-            {/* Confetti overlay (success only) */}
+            {/* Confetti (success) */}
             {isSuccess && (
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {confetti.map((p) => (
-                        <ConfettiPiece key={p.id} {...p} />
-                    ))}
+                    {confetti.map((p) => <ConfettiPiece key={p.id} {...p} />)}
                 </div>
             )}
 
-            {/* Toast body */}
+            {/* Body */}
             <div
                 className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl backdrop-blur-xl shadow-glass-lg"
-                style={{
-                    background: 'rgba(10,10,14,0.92)',
-                    border: `1px solid ${borderColor}`,
-                }}
+                style={{ background: 'rgba(10,10,14,0.92)', border: `1px solid ${borderColor}` }}
             >
-                {ICONS[toast.type] || ICONS.info}
+                {ICONS[toast.type] ?? ICONS.info}
                 <span className="text-white/90 text-sm font-medium">{toast.message}</span>
-                <button
+                <motion.button
                     onClick={() => onRemove(toast.id)}
                     className="ml-1 text-white/30 hover:text-white/70 transition-colors"
+                    whileHover={{ scale: 1.2 }}
+                    whileTap={{ scale: 0.85 }}
                     aria-label="Dismiss"
                 >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </motion.button>
             </div>
 
-            {/* Progress bar */}
+            {/* Progress drain */}
             <div
                 className="absolute bottom-0 left-0 h-[2px] rounded-full"
                 style={{
@@ -148,20 +124,21 @@ const Toast = ({ toast, onRemove }) => {
                     boxShadow: `0 0 6px ${progressColor}`,
                 }}
             />
-        </div>
+        </motion.div>
     );
-};
+});
+Toast.displayName = 'Toast';
 
 const ToastContainer = () => {
     const { toasts, removeToast } = useSwerveStore();
 
-    if (toasts.length === 0) return null;
-
     return (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[60] flex flex-col items-center gap-2 pointer-events-none min-w-[300px]">
-            {toasts.map((toast) => (
-                <Toast key={toast.id} toast={toast} onRemove={removeToast} />
-            ))}
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2 pointer-events-none min-w-[300px]">
+            <AnimatePresence mode="popLayout">
+                {toasts.map((toast) => (
+                    <Toast key={toast.id} toast={toast} onRemove={removeToast} />
+                ))}
+            </AnimatePresence>
         </div>
     );
 };

@@ -81,46 +81,118 @@ Modified for Phase 2:
 
 ---
 
-## Phase 3 — IN PROGRESS (Deep Research & Retention)
+## Phase 3 — COMPLETE (Deep Research & Retention)
 
-### Decision: Real Backend
-Building a real Express backend into `server.js` using **flat JSON file persistence** (no database install needed, works locally). Files stored in `.data/` directory at project root (gitignored).
+### Backend (server.js — fully built)
+Flat JSON file persistence in `.data/` (gitignored). All routes live:
+- `GET /api/hazards?lat=&lng=&radius=` — community reports, auto-expires after 4h
+- `POST /api/hazards` — submit report (clientId owner tracking, vote dedup)
+- `PUT /api/hazards/:id/vote` — upvote/downvote with toggle-off, one-per-client
+- `DELETE /api/hazards/:id` — owner-only delete
+- `GET /api/intelligence-feed?lat=&lng=&radius=` — community hazards sorted by distance
 
-Backend routes to build:
-- `GET /api/hazards` — fetch all community hazard reports
-- `POST /api/hazards` — submit new hazard report
-- `PUT /api/hazards/:id/vote` — upvote or downvote a report
-- `DELETE /api/hazards/:id` — remove a report (owner only, by clientId)
-- `GET /api/intelligence-feed` — aggregated feed: NWS alerts + community reports + weather for route
-- `POST /api/departure-optimizer` — given start/end coords + departure offsets, return SSI for each time slot
+### Files Built
+- `src/hooks/usePredictiveRouting.js` — 8 departure windows (now→+24h), Open-Meteo hourly forecast → SSI per slot, golden window detection (SSI ≥ 85)
+- `src/hooks/useCommunityHazards.js` — 2-min polling, pulsing diamond Mapbox markers, reportHazard/voteHazard/deleteHazard, Hazard Scout badge trigger
+- `src/components/ui/IntelligenceFeed.js` — collapsible bottom panel, NWS + community hazards, TTS readout for high severity, 90s polling, unread badge
+- `src/components/ui/HazardReportModal.js` — 5-type selector (Flooding/Debris/Accident/Ice/Construction), slide-up, location-aware, animated submit
 
-### Tasks Remaining in Phase 3:
-1. **`usePredictiveRouting.js`** + UI in `RouteEnginePanel.js`
-   - Departure time optimizer slider: now / +30min / +1hr / +2hr / +4hr / +6hr / +12hr / +24hr
-   - For each offset: fetch Open-Meteo hourly forecast → recalculate SSI via safetyEngine
-   - Render sparkline of SSI vs. departure time
-   - Highlight "golden window" where SSI > 85 (green band)
-   - User selects time → updates route planning
-
-2. **`IntelligenceFeed.js`** (new bottom collapsible panel)
-   - Auto-scrolling ticker: NWS alerts + community hazard reports + road camera statuses
-   - Each item: icon, severity badge, distance ahead, timestamp, expandable detail
-   - TTS auto-readout when new items arrive (uses existing `speak` from useTTS)
-   - Sources: NWS alerts (already in useNwsAlerts hook), community hazards (new backend), Road511
-
-3. **`useCommunityHazards.js`** + Mapbox layer
-   - Hook that polls `GET /api/hazards` every 2 minutes
-   - Report types: Flooding, Debris, Accident, Ice, Construction
-   - Map markers: pulsing diamonds for community reports, user-avatar circles for own reports
-   - Upvote/downvote dispatches `PUT /api/hazards/:id/vote`
-   - "Hazard Scout" badge triggers via Zustand when user submits first report in an area
+### Wired in MapOverlay.js (2026-04-24)
+- `usePredictiveRouting()` → passed as `predictive` prop to RouteEnginePanel with `centerLat/centerLng` from `lastRouteReport`
+- `useCommunityHazards({ mapRef, mapLoaded })` → markers auto-render; `userLoc` synced via reactive state on geolocate
+- `<IntelligenceFeed speak={speak} userLoc={userLoc} />` rendered after start screen
+- `<HazardReportModal reportHazard={hazards.reportHazard} userLoc={userLoc} />` triggered by ControlBar ⚠ button
+- Fixed coordinates bug in IntelligenceFeed (`[lng, lat]` Mapbox convention)
+- Removed `window.__SWERVE_STORE__` hack in RouteEnginePanel; uses `predictive.centerLat/Lng`
 
 ---
 
-## Phase 4 — NOT STARTED (Gamification)
-- `SwerveScorePanel.js` — scoring ring, levels (Novice→Scout→Ranger→Guardian→Legend), badges
-- Streak tracking in Zustand + fire animation on TelemetryPanel
-- Challenge Mode scaffold
+## Phase 4 — COMPLETE (Gamification & Virality)
+
+### Files Built
+- `src/components/ui/SwerveScorePanel.js` — animated level ring (Novice→Legend), 3-day+ streak fire animation, badges grid (12 badge types), weekly points, stats row. Triggered by trophy button in ControlBar.
+- `src/hooks/useLiveShare.js` — manages "Track My Drive" session: POST /api/live-route to create, 15s position updates via PUT, DELETE on stop. Persists clientId in localStorage.
+- `src/components/ui/LiveSharePanel.js` — slide-up panel with share URL, QR code, copy button, Web Share API, live SSI chip, Stop Sharing button. Pulsing cyan rings when active.
+
+### Files Modified for Phase 4
+- `src/store/useSwerveStore.js` — UPGRADED: extended `swerveScore` (level 0–4, currentStreak, longestStreak, lastRouteDate, weeklyPoints, weekStart, totalRoutes, safeRoutes, goldenDepartures); added `liveShare` state; new actions `awardRoutePoints` (full points/streak/badge logic), `setLiveShare`, `clearLiveShare`; added `ui.showSwerveScore`, `ui.showLiveShare`; bumped persist version to v4 with migration.
+- `src/hooks/useRoutePlanning.js` — calls `awardRoutePoints({ssi, distance})` after every route; shows "+X pts" toast and badge unlock toasts.
+- `server.js` — added: `POST /api/live-route`, `PUT /api/live-route/:id`, `GET /api/live-route/:id`, `DELETE /api/live-route/:id` (flat-file .data/live-routes.json, 4h TTL); added `format=stories` (1080×1920) to `POST /api/share-card`.
+- `src/components/ui/ControlBar.js` — added Trophy button (score panel) with level-color accent dot; Share button (live share) with pulsing cyan rings when active.
+- `src/components/MapOverlay.js` — imports `useLiveShare`, `SwerveScorePanel`, `LiveSharePanel`; wires `onSwerveScore`/`onLiveShare` to ControlBar; renders Phase 4 panels.
+
+### Gamification System
+Points formula: `max(1, round(distanceMiles × (ssi/100) × 10))` + 100 for golden departure + 50 for SSI ≥ 90
+Level thresholds: Novice (0), Scout (500), Ranger (2000), Guardian (5000), Legend (10000)
+12 badge types: first-route, safe-driver, storm-chaser, streak-3, streak-7, golden-window, hazard-scout, centurion, scout-rank, ranger-rank, guardian-rank, legend-rank
+
+---
+
+## Phase 5 — IN PROGRESS (Adventure Route + Polish)
+
+### Adventure Route — PARTIALLY COMPLETE (2026-04-24)
+User request: a third routing mode — not fastest or safest, but most exciting/scenic. A "thrill ride" for riders who want adventurous roads over optimal ones.
+
+#### ✅ DONE — Core algorithm + routing
+- `src/utils/safetyEngine.js` — `calculateAdventureScore(route, ssi, fastestRouteDist)` added
+  - **Sinuosity** (38%): route_km / crow-flies_km. Straight road = 1.0, mountain switchbacks = 2.0+. Score 0→1 at sinuosity 1.0→1.8.
+  - **Length premium** (22%): sweet spot 15–40% longer than fastest route.
+  - **SSI thrill factor** (25%): bell curve peaking at SSI≈68. Not too safe (boring), not too dangerous (reckless). Safety floor: SSI < 40 → `disqualified: true`.
+  - **Turn density** (15%): coordinate nodes per km (more turns = more engaging geometry).
+  - Returns: `{ as (0–100), adventureCategory ('Tame'|'Scenic'|'Exciting'|'Thrilling'|'Epic'), sinuosity, disqualified }`
+- `src/services/routingService.js` — `getAdventureRoutes(start, end)` added
+  - Fetches `driving-traffic` + `driving` profiles in parallel
+  - Merges + deduplicates by 200m distance bucket (avoids scoring same road twice)
+  - Returns up to 6 unique route candidates
+- `src/store/useSwerveStore.js` — `routeTelemetry` extended with `adventureScore`, `adventureCategory`, `isAdventureMode`
+- `src/hooks/useRoutePlanning.js` — fully updated:
+  - `drawRoutes(routes, { primaryRoute, primaryColor })` — now accepts adventure override; primary defaults to safest
+  - `planRoute(start, dest, startLabel, destLabel, { mode: 'safe'|'adventure' })` — new `mode` option
+  - Adventure mode: calls `getAdventureRoutes`, scores each route, selects highest AS with SSI≥40 floor, draws with `primaryColor: '#f97316'` (amber-orange), different TTS ("Follow the amber pulse — ride the thrill")
+  - Safety override when ALL routes SSI<40: falls back to safest, warns user
+  - `setRouteTelemetry({ adventureScore, adventureCategory, isAdventureMode })` merged after draw
+  - `lastRouteReport` extended with `adventureScore`, `adventureCategory`, `isAdventureMode`
+
+#### ❌ NOT YET DONE — UI layer (interrupted)
+The following still needs to be implemented for the adventure feature to be usable:
+
+**`src/components/ui/RouteEnginePanel.js`** — needs:
+- Accept `routeMode` (string) + `setRouteMode` (fn) props
+- Add a **Safe / Adventure segmented toggle** above the Plan button
+  - Safe: shield icon, `text-white`, current rose-500 button style
+  - Adventure: flame icon `🔥`, amber-orange button `linear-gradient(135deg, rgba(217,119,6,0.95), rgba(249,115,22,0.9))`, label "Plan Adventure Route"
+- Show adventure score result below the Plan button after routing (when `routeTelemetry.adventureScore` is set):
+  - Small AS chip: `🔥 AS 72 — Thrilling` in amber styling
+- Change `isRouting` spinner text: "Finding your thrill ride..." in adventure mode
+
+**`src/components/MapOverlay.js`** — needs:
+- `const [routeMode, setRouteMode] = useState('safe');`
+- Pass `routeMode` and `setRouteMode` to `<RouteEnginePanel />`
+- Change `handleManualRoute` to pass `{ mode: routeMode }` to `planRoute`:
+  ```js
+  await planRoute(startCoords, destCoords, startAddress, destAddress, { mode: routeMode });
+  ```
+
+**`src/components/ui/TelemetryPanel.js`** — needs:
+- Read `routeTelemetry.isAdventureMode`, `routeTelemetry.adventureScore`, `routeTelemetry.adventureCategory`
+- When `isAdventureMode`:
+  - Replace "Caution/Optimal" badge in header with `🔥 Adventure` badge (amber styling)
+  - Add AS row below SSI ring: `AS 72 — Thrilling` in amber text
+  - Optional: amber glow on ring border instead of SSI color
+
+#### Adventure Route Visual Design
+- Route line color: `#f97316` (orange-400) — amber pulse instead of cyan safety line
+- TTS: "Adventure route locked in. X miles of [thrilling] roads with sinuosity factor Y. Safety score Z. Follow the amber pulse — ride the thrill."
+- Safety override TTS: "Safety override: conditions are critical. Routing you safely with SSI N."
+- Adventure categories: Tame (0–14) | Scenic (15–34) | Exciting (35–54) | Thrilling (55–74) | Epic (75–100)
+
+---
+
+## Phase 5 Remaining — After Adventure Route UI is complete
+1. **Push Notification Re-engagement** — "Golden window opens in 45 min", "Storm approaching your saved route", "Your hazard report was upvoted"
+2. **Challenge Mode** — "30-Day Safe Driver", seasonal challenges (Hurricane Season Survivor), achievement cards
+3. **Insurance Integration Hook** — "Export your SSI history" PDF, telematics landing page
+4. **App Store Submission** — PWA → Capacitor for native wrapper, screenshots, App Store Connect
 
 ---
 
@@ -143,7 +215,8 @@ src/
       WeatherLayersPanel.js     — weather layer toggles
       WeatherDetailPanel.js     — current weather + 7-day forecast
       LoadingOverlay.js         — routing spinner
-      IntelligenceFeed.js       — [TO BUILD — Phase 3]
+      IntelligenceFeed.js       — collapsible bottom feed: NWS + community hazards (Phase 3 complete)
+      HazardReportModal.js      — slide-up hazard type selector (Phase 3 complete)
   hooks/
     useRoutePlanning.js         — route calc, safety analysis, moment capture trigger
     useWeatherPolling.js        — 5-min Open-Meteo polling
@@ -155,8 +228,8 @@ src/
     useWindLayer.js / useCloudLayer.js / useLightningLayer.js
     useNwsAlerts.js             — NWS severe weather alerts layer
     useNexradLayer.js / useStormCellTracker.js
-    usePredictiveRouting.js     — [TO BUILD — Phase 3]
-    useCommunityHazards.js      — [TO BUILD — Phase 3]
+    usePredictiveRouting.js     — 8-slot departure optimizer, Open-Meteo forecast → SSI (Phase 3 complete)
+    useCommunityHazards.js      — 2-min polling, Mapbox markers, badge trigger (Phase 3 complete)
   store/
     useSwerveStore.js           — Zustand: all state + actions (see Phase 2 additions above)
   utils/

@@ -64,6 +64,10 @@ const useSwerveStore = create(
         distance: null,
         modeEtas: { driving: null, cycling: null, walking: null },
         lastUpdated: null,
+        // Phase 5: Adventure Route
+        adventureScore: null,       // 0–100 or null when in safe mode
+        adventureCategory: null,    // 'Scenic'|'Exciting'|'Thrilling'|'Epic'|null
+        isAdventureMode: false,
       },
 
       // Saved routes
@@ -103,6 +107,45 @@ const useSwerveStore = create(
         stormTracker: false,
       },
 
+      // Phase 3: Community hazards
+      communityHazards: [],
+
+      // Phase 3: Intelligence feed
+      intelligenceFeed: {
+        items: [],
+        lastUpdated: null,
+        unreadCount: 0,
+      },
+
+      // Phase 3: Predictive routing
+      predictiveRouting: {
+        results: null,
+        selectedOffset: 0,
+        isLoading: false,
+      },
+
+      // Phase 3+4: Swerve score + gamification
+      swerveScore: {
+        total: 0,
+        level: 0,            // 0=Novice 1=Scout 2=Ranger 3=Guardian 4=Legend
+        badges: [],
+        currentStreak: 0,    // consecutive days with a route
+        longestStreak: 0,
+        lastRouteDate: null, // 'YYYY-MM-DD'
+        weeklyPoints: 0,
+        weekStart: null,     // 'YYYY-MM-DD' (Monday of current week)
+        totalRoutes: 0,
+        safeRoutes: 0,       // routes with SSI >= 75
+        goldenDepartures: 0,
+      },
+
+      // Phase 4: Live route share ("Track My Drive")
+      liveShare: {
+        id: null,
+        isActive: false,
+        shareUrl: null,
+      },
+
       // Shareable moments (captured after extreme SSI routes)
       moments: [],
 
@@ -122,6 +165,11 @@ const useSwerveStore = create(
         showSafetyReport: false,
         showWeatherReplay: false,
         showMomentCapture: false,
+        showIntelligenceFeed: false,
+        showHazardReport: false,
+        showPredictiveRouting: false,
+        showSwerveScore: false,  // Phase 4: score panel
+        showLiveShare: false,    // Phase 4: Track My Drive
       },
 
       // Actions
@@ -262,6 +310,137 @@ const useSwerveStore = create(
       setWeatherLayers: (layers) =>
         set({ weatherLayers: { ...get().weatherLayers, ...layers } }),
 
+      // Phase 3 actions
+      setCommunityHazards: (hazards) => set({ communityHazards: hazards }),
+
+      setIntelligenceFeed: (items) =>
+        set((state) => ({
+          intelligenceFeed: {
+            items,
+            lastUpdated: Date.now(),
+            unreadCount: state.ui.showIntelligenceFeed
+              ? 0
+              : Math.max(0, items.length - state.intelligenceFeed.items.length),
+          },
+        })),
+
+      markFeedRead: () =>
+        set((state) => ({
+          intelligenceFeed: { ...state.intelligenceFeed, unreadCount: 0 },
+        })),
+
+      setPredictiveRouting: (data) =>
+        set((state) => ({
+          predictiveRouting: { ...state.predictiveRouting, ...data },
+        })),
+
+      // Legacy: kept for useCommunityHazards Hazard Scout badge
+      awardBadge: (badge) =>
+        set((state) => {
+          const sc = state.swerveScore;
+          if (sc.badges.includes(badge)) return {};
+          return {
+            swerveScore: {
+              ...sc,
+              badges: [...sc.badges, badge],
+              total: sc.total + 50,
+            },
+          };
+        }),
+
+      // Phase 4: award points after a route completes
+      awardRoutePoints: ({ ssi = 0, distance = 0, isGoldenDeparture = false }) => {
+        const sc = get().swerveScore;
+
+        // ── Points ────────────────────────────────────────────────────────────
+        const distanceMiles = distance / 1609.34;
+        const ssiPct = Math.max(0, Math.min(100, ssi)) / 100;
+        let earned = Math.max(1, Math.round(distanceMiles * ssiPct * 10));
+        if (isGoldenDeparture) earned += 100;
+        if (ssi >= 90) earned += 50;
+
+        // ── Date helpers ──────────────────────────────────────────────────────
+        const today = new Date().toISOString().slice(0, 10);
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const mondayDate = (() => {
+          const d = new Date();
+          const day = d.getDay(); // 0=Sun
+          const diff = day === 0 ? -6 : 1 - day;
+          d.setDate(d.getDate() + diff);
+          return d.toISOString().slice(0, 10);
+        })();
+
+        // ── Streak ────────────────────────────────────────────────────────────
+        let newStreak = sc.currentStreak;
+        if (!sc.lastRouteDate || sc.lastRouteDate < yesterday) {
+          newStreak = 1;
+        } else if (sc.lastRouteDate === yesterday) {
+          newStreak = sc.currentStreak + 1;
+        }
+        // else: same day — keep current streak
+        const newLongest = Math.max(sc.longestStreak, newStreak);
+
+        // ── Weekly ────────────────────────────────────────────────────────────
+        const weeklyPoints = (sc.weekStart === mondayDate ? sc.weeklyPoints : 0) + earned;
+
+        // ── Totals ────────────────────────────────────────────────────────────
+        const newTotal = sc.total + earned;
+        const newTotalRoutes = sc.totalRoutes + 1;
+        const newSafeRoutes = ssi >= 75 ? sc.safeRoutes + 1 : sc.safeRoutes;
+        const newGolden = isGoldenDeparture ? sc.goldenDepartures + 1 : sc.goldenDepartures;
+
+        // ── Level (0–4) ───────────────────────────────────────────────────────
+        const THRESHOLDS = [0, 500, 2000, 5000, 10000];
+        let newLevel = 0;
+        for (let i = THRESHOLDS.length - 1; i >= 0; i--) {
+          if (newTotal >= THRESHOLDS[i]) { newLevel = i; break; }
+        }
+        const leveledUp = newLevel > sc.level;
+
+        // ── Badges ────────────────────────────────────────────────────────────
+        const existing = new Set(sc.badges);
+        const newBadgeIds = [];
+        const tryBadge = (id) => { if (!existing.has(id)) { existing.add(id); newBadgeIds.push(id); } };
+
+        if (newTotalRoutes === 1)                        tryBadge('first-route');
+        if (newSafeRoutes >= 10)                         tryBadge('safe-driver');
+        if (ssi <= 60)                                   tryBadge('storm-chaser');
+        if (newStreak >= 3)                              tryBadge('streak-3');
+        if (newStreak >= 7)                              tryBadge('streak-7');
+        if (isGoldenDeparture && newGolden === 1)        tryBadge('golden-window');
+        if (newTotalRoutes >= 100)                       tryBadge('centurion');
+        if (leveledUp) {
+          const RANK_BADGES = ['', 'scout-rank', 'ranger-rank', 'guardian-rank', 'legend-rank'];
+          if (RANK_BADGES[newLevel]) tryBadge(RANK_BADGES[newLevel]);
+        }
+
+        set({
+          swerveScore: {
+            ...sc,
+            total: newTotal,
+            level: newLevel,
+            badges: [...existing],
+            currentStreak: newStreak,
+            longestStreak: newLongest,
+            lastRouteDate: today,
+            weeklyPoints,
+            weekStart: mondayDate,
+            totalRoutes: newTotalRoutes,
+            safeRoutes: newSafeRoutes,
+            goldenDepartures: newGolden,
+          },
+        });
+
+        return { earned, leveledUp, newLevel, newBadgeIds };
+      },
+
+      // Phase 4: live share state
+      setLiveShare: (data) =>
+        set((state) => ({ liveShare: { ...state.liveShare, ...data } })),
+
+      clearLiveShare: () =>
+        set({ liveShare: { id: null, isActive: false, shareUrl: null } }),
+
       // Phase 2 actions
       setLastRouteReport: (report) => set({ lastRouteReport: report }),
 
@@ -279,18 +458,32 @@ const useSwerveStore = create(
       setWeatherHistory: (history) => set({ weatherHistory: history }),
     }),
     {
-      name: 'swerve-storage-v3',
-      version: 3,
+      name: 'swerve-storage-v4',
+      version: 4,
       migrate: (persistedState, version) => {
-        // Discard any state from older versions to pick up new mapbox:// style defaults
+        let state = persistedState;
         if (version < 3) {
-          return {
-            ...persistedState,
-            mapTheme: 'mapbox://styles/mapbox/dark-v11',
-            theme: 'dark',
+          state = { ...state, mapTheme: 'mapbox://styles/mapbox/dark-v11', theme: 'dark' };
+        }
+        if (version < 4) {
+          // Merge new swerveScore fields on top of any existing total/badges
+          state = {
+            ...state,
+            swerveScore: {
+              level: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+              lastRouteDate: null,
+              weeklyPoints: 0,
+              weekStart: null,
+              totalRoutes: 0,
+              safeRoutes: 0,
+              goldenDepartures: 0,
+              ...(state.swerveScore || {}),
+            },
           };
         }
-        return persistedState;
+        return state;
       },
       partialize: (state) => ({
         theme: state.theme,
@@ -299,6 +492,7 @@ const useSwerveStore = create(
         savedRoutes: state.savedRoutes,
         notificationPermission: state.notificationPermission,
         moments: state.moments,
+        swerveScore: state.swerveScore,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

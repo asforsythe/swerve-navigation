@@ -1,60 +1,93 @@
 /*
- * Swerve Design Tokens
- * Single source of truth for all design values.
+ * Swerve Design Tokens — CSS Custom Properties
+ * Synced from src/design/tokens.js.
  * Import this file first in index.css.
  */
 :root {
-  /* ── Colors ────────────────────────────────────────────────────────── */
-  --c-primary:  #f43f5e;              /* rose-500   — actions, alerts       */
-  --c-safe:     #22d3ee;              /* cyan-400   — safe routes, scanner  */
-  --c-optimal:  #34d399;              /* emerald-400 — SSI high             */
-  --c-caution:  #fbbf24;              /* amber-400  — SSI mid               */
-  --c-critical: #ef4444;              /* red-500    — SSI low, hazards      */
-  --c-info:     #60a5fa;              /* blue-400   — radar, info           */
-  --c-violet:   #a78bfa;              /* violet-400 — research panels       */
-  --c-gold:     #fcd34d;              /* amber-300  — streaks, scores       */
-  --c-surface:  #0a0a0e;              /* glass panel background             */
-  --c-border:   rgba(255,255,255,0.08);
-  --c-text:     rgba(255,255,255,0.90);
-  --c-muted:    rgba(255,255,255,0.40);
+  /* ── Brand ─────────────────────────────────────────────────────────────── */
+  --c-primary:     #f43f5e;
+  --c-primary-dim: rgba(244, 63, 94, 0.15);
+  --c-primary-glow:rgba(244, 63, 94, 0.45);
 
-  /* SSI color stops referenced by JS via CSS var reads */
-  --ssi-color-high: var(--c-optimal);  /* SSI > 80  */
-  --ssi-color-mid:  var(--c-caution);  /* SSI 50-80 */
-  --ssi-color-low:  var(--c-critical); /* SSI < 50  */
+  /* ── Safety Spectrum ───────────────────────────────────────────────────── */
+  --c-safe:        #34d399;
+  --c-safe-glow:   rgba(52, 211, 153, 0.50);
+  --c-optimal:     #22d3ee;
+  --c-optimal-glow:rgba(34, 211, 238, 0.50);
+  --c-caution:     #fbbf24;
+  --c-caution-glow:rgba(251, 191, 36, 0.50);
+  --c-warn:        #f97316;
+  --c-warn-glow:   rgba(249, 115, 22, 0.50);
+  --c-critical:    #ef4444;
+  --c-critical-glow:rgba(239, 68, 68, 0.50);
 
-  /* ── Glows / Shadows ───────────────────────────────────────────────── */
+  /* ── Accents ───────────────────────────────────────────────────────────── */
+  --c-violet:      #a78bfa;
+  --c-violet-glow: rgba(167, 139, 250, 0.50);
+  --c-blue:        #60a5fa;
+  --c-blue-glow:   rgba(96, 165, 250, 0.50);
+  --c-gold:        #fcd34d;
+  --c-info:        #60a5fa;
+
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --c-surface:     #0a0a0e;
+  --c-surface-high:#111118;
+  --c-surface-mid: #0d0d14;
+  --c-border:      rgba(255,255,255,0.08);
+  --c-border-high: rgba(255,255,255,0.14);
+
+  /* ── Text ──────────────────────────────────────────────────────────────── */
+  --c-text:        rgba(255,255,255,0.90);
+  --c-text-sec:    rgba(255,255,255,0.55);
+  --c-muted:       rgba(255,255,255,0.30);
+  --c-dim:         rgba(255,255,255,0.15);
+
+  /* ── Shadows ───────────────────────────────────────────────────────────── */
   --shadow-glass:    0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
   --shadow-glass-lg: 0 12px 48px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.08);
-  --glow-cyan:    0 0 20px rgba(34,  211, 238, 0.50);
-  --glow-rose:    0 0 20px rgba(244,  63,  94, 0.50);
-  --glow-emerald: 0 0 20px rgba(52,  211, 153, 0.50);
-  --glow-amber:   0 0 20px rgba(251, 191,  36, 0.50);
-  --glow-violet:  0 0 20px rgba(167, 139, 250, 0.50);
+  --shadow-glass-xl: 0 24px 64px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.10);
+  --glow-cyan:       0 0 20px rgba(34, 211, 238, 0.50);
+  --glow-rose:       0 0 20px rgba(244,  63,  94, 0.50);
+  --glow-emerald:    0 0 20px rgba(52,  211, 153, 0.50);
+  --glow-amber:      0 0 20px rgba(251, 191,  36, 0.50);
+  --glow-violet:     0 0 20px rgba(167, 139, 250, 0.50);
 
-  /* ── Timing ────────────────────────────────────────────────────────── */
+  /* ── Timing ────────────────────────────────────────────────────────────── */
+  --t-instant: 80ms;
   --t-fast:    150ms;
-  --t-std:     300ms;
-  --t-slow:    600ms;
+  --t-std:     280ms;
+  --t-slow:    500ms;
+  --t-slower:  700ms;
   --t-ambient: 5s;
 
-  /* ── Easing ────────────────────────────────────────────────────────── */
+  /* ── Easing ────────────────────────────────────────────────────────────── */
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-std:    cubic-bezier(0.4,  0, 0.2, 1);
-  --ease-out:    cubic-bezier(0,    0, 0.2, 1);
+  --ease-out:    cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-inout:  cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-in:     cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* ── Orbit radii (TelemetryPanel CSS var, override per particle) ───── */
+  /* ── Border radius ─────────────────────────────────────────────────────── */
+  --r-sm:  10px;
+  --r-md:  14px;
+  --r-lg:  20px;
+  --r-xl:  28px;
+
+  /* ── Orbit radii ───────────────────────────────────────────────────────── */
   --orbit-r-sm: 48px;
   --orbit-r-md: 62px;
   --orbit-r-lg: 76px;
 
-  /* ── Z-index layers ─────────────────────────────────────────────────── */
-  --z-map:     0;
-  --z-weather: 11;
-  --z-route:   21;
-  --z-markers: 31;
-  --z-panels:  41;
-  --z-modals:  51;
-  --z-toasts:  61;
-  --z-fx:      71;
+  /* ── Z-index layers ─────────────────────────────────────────────────────── */
+  --z-map:         0;
+  --z-particles:   11;
+  --z-weather:     11;
+  --z-route:       21;
+  --z-markers:     31;
+  --z-panels:      40;
+  --z-safety-rep:  50;
+  --z-hazard:      55;
+  --z-moment:      70;
+  --z-toasts:      80;
+  --z-fx:          90;
 }

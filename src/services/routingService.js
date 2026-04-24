@@ -48,6 +48,34 @@ export const getRoutes = async (start, end, profile = 'driving-traffic') => {
 };
 
 /**
+ * Fetches routes for Adventure Mode.
+ * Requests both driving-traffic and driving (non-traffic) profiles in parallel, then
+ * merges unique alternatives. The driving profile often surfaces more scenic surface
+ * roads that the traffic-optimised profile hides behind highways.
+ *
+ * Deduplicates by distance bucket (200 m) to avoid scoring the same road twice.
+ *
+ * @returns {Promise<Array>} Up to 6 merged, deduplicated route objects
+ */
+export const getAdventureRoutes = async (start, end) => {
+  const [trafficRoutes, freeRoutes] = await Promise.all([
+    getRoutes(start, end, 'driving-traffic').catch(() => []),
+    getRoutes(start, end, 'driving').catch(() => []),
+  ]);
+
+  const all = [...(trafficRoutes || []), ...(freeRoutes || [])];
+
+  // Deduplicate: two routes with distance within 200 m of each other are the same road
+  const seen = new Set();
+  return all.filter((r) => {
+    const bucket = Math.round((r.distance || 0) / 200);
+    if (seen.has(bucket)) return false;
+    seen.add(bucket);
+    return true;
+  });
+};
+
+/**
  * Lightweight ETA-only fetch — returns { duration (seconds), distance (meters) } for a single profile.
  * Uses geometries=false, steps=false, alternatives=false to minimise response size.
  */

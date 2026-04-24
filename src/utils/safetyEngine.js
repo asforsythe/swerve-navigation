@@ -168,6 +168,99 @@ export const calculateRouteSafety = (route, weatherDataPoints) => {
   };
 };
 
+// ── Haversine helper (km) — used by adventure scoring ─────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Adventure Score (AS) — rates how thrilling/scenic a route is.
+ *
+ * Inputs:
+ *   route             — Mapbox route object (needs .distance + .geometry.coordinates)
+ *   ssi               — pre-computed SSI for this route (0–100)
+ *   fastestRouteDist  — distance (meters) of the fastest available route
+ *
+ * Returns { as (0-100), adventureCategory, sinuosity, disqualified }
+ * disqualified=true when SSI < 40 (safety floor — too dangerous for adventure)
+ *
+ * Scoring components:
+ *   - Sinuosity     (38%) — route distance / crow-flies distance (winding = high)
+ *   - Length premium(22%) — sweet spot: 15-40% longer than fastest
+ *   - SSI thrill    (25%) — bell-curve peaking at SSI≈68 (caution/fair adds drama)
+ *   - Turn density  (15%) — coordinate nodes per km (more turns = more engaging)
+ */
+export const calculateAdventureScore = (route, ssi, fastestRouteDist) => {
+  const coords = route.geometry?.coordinates ?? [];
+  const routeDist = route.distance || 0;
+  const fastestDist = fastestRouteDist || routeDist;
+
+  if (coords.length < 2 || routeDist < 500) {
+    return { as: 0, adventureCategory: 'Unknown', sinuosity: 1, disqualified: false };
+  }
+
+  // Safety floor
+  if (ssi < 40) {
+    return { as: 0, adventureCategory: 'Too Dangerous', sinuosity: 1, disqualified: true };
+  }
+
+  const routeKm   = routeDist / 1000;
+  const fastestKm = fastestDist / 1000;
+
+  // ── Sinuosity ─────────────────────────────────────────────────────────────
+  const [startLng, startLat] = coords[0];
+  const [endLng,   endLat  ] = coords[coords.length - 1];
+  const straightLineKm = Math.max(0.1, haversineKm(startLat, startLng, endLat, endLng));
+  const sinuosity = routeKm / straightLineKm;
+  // 0 at sinuosity 1.0 (straight), 1.0 at sinuosity 1.8+
+  const sinuosityScore = Math.min(1, Math.max(0, (sinuosity - 1.0) / 0.8));
+
+  // ── Length premium ────────────────────────────────────────────────────────
+  const extraPct = fastestKm > 0 ? Math.max(0, (routeKm - fastestKm) / fastestKm) : 0;
+  let lengthScore;
+  if (extraPct < 0.05) {
+    lengthScore = (extraPct / 0.05) * 0.15;
+  } else if (extraPct <= 0.40) {
+    lengthScore = 0.15 + ((extraPct - 0.05) / 0.35) * 0.85;
+  } else {
+    lengthScore = Math.max(0, 1.0 - (extraPct - 0.40) / 0.35);
+  }
+
+  // ── SSI thrill factor ─────────────────────────────────────────────────────
+  // Bell curve: peaks at SSI ≈ 68 (Caution/Fair edge — exciting but not critical)
+  const ssiThrill = ssi < 68
+    ? (ssi - 40) / 28                          // ramp 0→1 from SSI 40 to 68
+    : Math.max(0, 1 - (ssi - 68) / 45);        // taper 1→0.29 from SSI 68 to 100+
+
+  // ── Turn density ──────────────────────────────────────────────────────────
+  const nodesPerKm = routeKm > 0 ? coords.length / routeKm : 0;
+  const turnScore  = Math.min(1, nodesPerKm / 20); // 20+ nodes/km = max
+
+  // ── Composite ─────────────────────────────────────────────────────────────
+  const raw = sinuosityScore * 0.38 + lengthScore * 0.22 + ssiThrill * 0.25 + turnScore * 0.15;
+  const as  = Math.round(Math.max(0, Math.min(100, raw * 100)));
+
+  let adventureCategory = 'Tame';
+  if (as >= 75) adventureCategory = 'Epic';
+  else if (as >= 55) adventureCategory = 'Thrilling';
+  else if (as >= 35) adventureCategory = 'Exciting';
+  else if (as >= 15) adventureCategory = 'Scenic';
+
+  return {
+    as,
+    adventureCategory,
+    sinuosity: Math.round(sinuosity * 100) / 100,
+    disqualified: false,
+  };
+};
+
 /**
  * Quick safety assessment for a single point (used for live telemetry).
  */

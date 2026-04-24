@@ -27,6 +27,13 @@ import ToastContainer from './ui/ToastContainer';
 import SafetyReportPanel from './ui/SafetyReportPanel';
 import WeatherReplayPanel from './ui/WeatherReplayPanel';
 import MomentCapturedOverlay from './ui/MomentCapturedOverlay';
+import IntelligenceFeed from './ui/IntelligenceFeed';
+import HazardReportModal from './ui/HazardReportModal';
+import SwerveScorePanel from './ui/SwerveScorePanel';
+import LiveSharePanel from './ui/LiveSharePanel';
+import { usePredictiveRouting } from '../hooks/usePredictiveRouting';
+import { useCommunityHazards } from '../hooks/useCommunityHazards';
+import { useLiveShare } from '../hooks/useLiveShare';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -44,10 +51,12 @@ const MapOverlay = () => {
   const [mapError, setMapError] = useState(null);
   const [showStartButton, setShowStartButton] = useState(true);
   const [travelMode, setTravelMode] = useState('driving');
+  const [routeMode, setRouteMode] = useState('safe'); // 'safe' | 'adventure'
   const [isSweeping, setIsSweeping] = useState(false);
   const [showSavedRoutes, setShowSavedRoutes] = useState(false);
   const [startAddress, setStartAddress] = useState('');
   const [destAddress, setDestAddress] = useState('');
+  const [userLoc, setUserLoc] = useState(null); // [lng, lat] — reactive for feed/hazard props
 
   const {
     theme,
@@ -62,7 +71,15 @@ const MapOverlay = () => {
     routeTelemetry,
     setUiState,
     ui,
+    lastRouteReport,
   } = useSwerveStore();
+
+  // Phase 4 live share hook (needs userLocationRef, routeTelemetry, lastRouteReport)
+  const { liveShare, startShare, stopShare } = useLiveShare({
+    userLocationRef,
+    routeTelemetry,
+    lastRouteReport,
+  });
 
   // Hooks
   const { isReady: isVoiceReady, speak, unlockAudio, flushQueue } = useTTS();
@@ -91,6 +108,10 @@ const MapOverlay = () => {
   const { refresh: refreshNexrad } = useNexradLayer({ mapRef, mapLoaded });
   const { stormCells, refresh: refreshStormTracker } = useStormCellTracker({ mapRef, mapLoaded });
 
+  // Phase 3 hooks
+  const predictiveHook = usePredictiveRouting();
+  const hazards = useCommunityHazards({ mapRef, mapLoaded });
+
   // Refs for values used in map init effect (to avoid unstable deps)
   const speakRef = useRef(speak);
   const mapThemeRef = useRef(mapTheme);
@@ -116,6 +137,11 @@ const MapOverlay = () => {
   useEffect(() => { refreshNexradRef.current = refreshNexrad; }, [refreshNexrad]);
   useEffect(() => { refreshStormTrackerRef.current = refreshStormTracker; }, [refreshStormTracker]);
   useEffect(() => { clearHazardMarkersRef.current = clearHazardMarkers; }, [clearHazardMarkers]);
+
+  // Sync geolocated position to community hazards hook
+  useEffect(() => {
+    if (userLoc) hazards.setUserLocation(userLoc);
+  }, [userLoc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Theme switch re-add layers — only fires on actual theme change, not initial load
   useEffect(() => {
@@ -381,8 +407,8 @@ const MapOverlay = () => {
       return;
     }
 
-    await planRoute(startCoords, destCoords, startAddress, destAddress);
-  }, [startAddress, destAddress, planRoute, speak, addToast]);
+    await planRoute(startCoords, destCoords, startAddress, destAddress, { mode: routeMode });
+  }, [startAddress, destAddress, planRoute, speak, addToast, routeMode]);
 
   // Context menu route
   const handleRouteRequest = useCallback(
@@ -495,6 +521,7 @@ const MapOverlay = () => {
       geolocate.on('geolocate', (e) => {
         const loc = [e.coords.longitude, e.coords.latitude];
         userLocationRef.current = loc;
+        setUserLoc(loc); // update reactive state for feed/hazard modal props
         setLightningUserLoc?.(loc);
       });
 
@@ -577,6 +604,15 @@ const MapOverlay = () => {
             onWeatherReplay={() =>
               setUiState({ showWeatherReplay: !ui.showWeatherReplay })
             }
+            onHazardReport={() =>
+              setUiState({ showHazardReport: !ui.showHazardReport })
+            }
+            onSwerveScore={() =>
+              setUiState({ showSwerveScore: !ui.showSwerveScore, showLiveShare: false })
+            }
+            onLiveShare={() =>
+              setUiState({ showLiveShare: !ui.showLiveShare, showSwerveScore: false })
+            }
           />
 
           <WeatherLayersPanel />
@@ -621,6 +657,13 @@ const MapOverlay = () => {
             modeEtas={routeTelemetry.modeEtas}
             travelMode={travelMode}
             setTravelMode={setTravelMode}
+            predictive={{
+              ...predictiveHook,
+              centerLat: lastRouteReport?.centerLat,
+              centerLng: lastRouteReport?.centerLng,
+            }}
+            routeMode={routeMode}
+            setRouteMode={setRouteMode}
           />
         </>
       )}
@@ -632,6 +675,25 @@ const MapOverlay = () => {
       <SafetyReportPanel />
       <WeatherReplayPanel />
       <MomentCapturedOverlay />
+
+      {/* Phase 3 panels — render after map is loaded, independent of start screen */}
+      {mapLoaded && !showStartButton && (
+        <>
+          <IntelligenceFeed speak={speak} userLoc={userLoc} />
+          <HazardReportModal reportHazard={hazards.reportHazard} userLoc={userLoc} />
+        </>
+      )}
+
+      {/* Phase 4 panels */}
+      {mapLoaded && !showStartButton && (
+        <>
+          <SwerveScorePanel />
+          <LiveSharePanel
+            onStart={startShare}
+            onStop={stopShare}
+          />
+        </>
+      )}
 
       {/* Saved Routes Modal */}
       {showSavedRoutes && (

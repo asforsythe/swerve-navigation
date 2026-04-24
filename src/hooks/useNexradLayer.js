@@ -6,19 +6,11 @@ import useSwerveStore from '../store/useSwerveStore';
 const NEXRAD_TILES =
     'https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png';
 
-// NASA GIBS — MODIS Terra true-color satellite imagery (global, daily)
-// Shows actual clouds, land, ocean from space.  TMS scheme required (y-flipped).
-const GIBS_TILES =
-    'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/{date}/GoogleMapsCompatible_Level9/{z}/{x}/{y}.jpg';
+// OpenWeatherMap — cloud cover tiles (global, ~10-min updates, no tile gaps)
+// Replaces GIBS MODIS which 404s on unimaged swath tiles and uses TMS vs XYZ.
+const OWM_CLOUD_TILES = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${process.env.REACT_APP_OWM_KEY}`;
 
 const REFRESH_MS = 300000; // 5 minutes
-
-function formatDate(d) {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
 
 export function useNexradLayer({ mapRef, mapLoaded }) {
     const [isNexradVisible, setIsNexradVisible] = useState(false);
@@ -93,7 +85,7 @@ export function useNexradLayer({ mapRef, mapLoaded }) {
         if (map.getSource(radarSourceId)) map.removeSource(radarSourceId);
     }, [mapRef]);
 
-    // ── GIBS Clouds (satellite imagery) ──────────────────────────────────
+    // ── OWM Clouds ────────────────────────────────────────────────────────
     const injectClouds = useCallback(() => {
         if (!mapRef.current) return;
         const map = mapRef.current;
@@ -103,26 +95,15 @@ export function useNexradLayer({ mapRef, mapLoaded }) {
             return;
         }
 
-        // GIBS MODIS tiles on the 'best' endpoint typically lag by 1-2 days.
-        // Use 2 days ago to guarantee availability and avoid 404s.
-        const safeDate = new Date();
-        safeDate.setDate(safeDate.getDate() - 2);
-        const dateStr = formatDate(safeDate);
-        const tiles = [GIBS_TILES.replace(/{date}/g, dateStr)];
-
         if (!map.getSource(cloudSourceId)) {
             map.addSource(cloudSourceId, {
                 type: 'raster',
-                tiles,
+                tiles: [OWM_CLOUD_TILES],
                 tileSize: 256,
-                scheme: 'tms', // GIBS uses TMS (y-flipped) coordinates
-                minzoom: 1,
-                maxzoom: 9, // GoogleMapsCompatible_Level9 only serves z0-9
-                attribution: 'Clouds: NASA GIBS / MODIS Terra',
+                attribution: 'Clouds: OpenWeatherMap',
             });
         }
 
-        // Insert cloud layer just above land/water but below labels so text stays readable
         const firstSymbol = map.getStyle()?.layers?.find((l) => l.type === 'symbol');
 
         map.addLayer(
@@ -131,17 +112,15 @@ export function useNexradLayer({ mapRef, mapLoaded }) {
                 type: 'raster',
                 source: cloudSourceId,
                 paint: {
-                    'raster-opacity': 0.32,
+                    'raster-opacity': 0.55,
                     'raster-fade-duration': 400,
-                    'raster-saturation': -0.85, // desaturate so it blends with dark theme
-                    'raster-contrast': 0.45,
-                    'raster-brightness-min': 0.1,
-                    'raster-brightness-max': 0.9,
+                    'raster-saturation': -0.60,
+                    'raster-contrast': 0.25,
                 },
             },
             firstSymbol?.id
         );
-        console.log(`[Swerve Radar] Cloud layer added (GIBS date: ${dateStr})`);
+        console.log('[Swerve Radar] Cloud layer added (OWM)');
     }, [mapRef]);
 
     const removeClouds = useCallback(() => {

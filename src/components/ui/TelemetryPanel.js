@@ -1,6 +1,40 @@
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import useSwerveStore from '../../store/useSwerveStore';
 import WeatherIcon, { getWeatherTheme } from '../weather/WeatherIcon';
+import { ssiTheme } from '../../design/tokens';
+import { slideRight } from '../../design/motion';
+
+// ── Animated Rolling Number ────────────────────────────────────────────────────
+const RollingNumber = ({ value, className = '', suffix = '' }) => {
+    const rounded = Math.round(value);
+    const prev = useRef(rounded);
+    const dir  = rounded >= prev.current ? 1 : -1;
+    useEffect(() => { prev.current = rounded; }, [rounded]);
+
+    return (
+        <span className={`relative inline-block overflow-hidden ${className}`} style={{ lineHeight: 1 }}>
+            <AnimatePresence mode="popLayout" custom={dir}>
+                <motion.span
+                    key={rounded}
+                    custom={dir}
+                    variants={{
+                        enter:  (d) => ({ y: d > 0 ? '60%' : '-60%', opacity: 0 }),
+                        center:           { y: 0, opacity: 1 },
+                        exit:   (d) => ({ y: d > 0 ? '-60%': '60%',  opacity: 0 }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+                    className="inline-block"
+                >
+                    {rounded}{suffix}
+                </motion.span>
+            </AnimatePresence>
+        </span>
+    );
+};
 
 // ── Mini Sparkline with Area Fill ──────────────────────────────────────────────
 const AreaSparkline = ({ values, color, width = 56, height = 22 }) => {
@@ -301,21 +335,29 @@ const TelemetryPanel = memo(() => {
         setTractionHistory((prev) => [...prev.slice(-6), traction]);
     }, [traction]);
 
-    const ringColor = ssi > 80 ? '#22c55e' : ssi > 50 ? '#eab308' : '#ef4444';
-    const ringGlow = ssi > 80 ? 'rgba(34,197,94,0.6)' : ssi > 50 ? 'rgba(234,179,8,0.6)' : 'rgba(239,68,68,0.6)';
-    const edgeColor = ssi > 80 ? 'rgba(34,197,94,0.45)' : ssi > 50 ? 'rgba(234,179,8,0.45)' : 'rgba(239,68,68,0.55)';
+    const isAdventureMode = routeTelemetry?.isAdventureMode ?? false;
+    const adventureScore = routeTelemetry?.adventureScore ?? null;
+    const adventureCategory = routeTelemetry?.adventureCategory ?? null;
+
+    const { color: ssiRingColor, glow: ringGlowRaw } = ssiTheme(ssi);
+    const ringColor = isAdventureMode ? '#f97316' : ssiRingColor;
+    const ringGlow = isAdventureMode ? 'rgba(249,115,22,0.6)' : ringGlowRaw;
+    const edgeColor = ringColor + '70';
     const circumference = 2 * Math.PI * 40;
     const offset = circumference - (circumference * ssi) / 100;
 
-    const sparkColor = ssi > 80 ? '#22c55e' : ssi > 50 ? '#eab308' : '#ef4444';
+    const sparkColor = ringColor;
 
     return (
-        <div
-            className="absolute top-6 left-6 z-40 w-80 rounded-[20px] glass-panel animate-slide-in-left overflow-hidden cursor-pointer"
+        <motion.div
+            className="absolute top-6 left-6 z-40 w-80 rounded-[20px] glass-panel overflow-hidden cursor-pointer"
             style={{
                 boxShadow: `0 0 0 1px ${edgeColor}, 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
                 transition: 'box-shadow 1.5s ease',
             }}
+            variants={slideRight}
+            initial="hidden"
+            animate="visible"
             onClick={() => setIsExpanded((v) => !v)}
             title="Click to expand"
         >
@@ -338,14 +380,21 @@ const TelemetryPanel = memo(() => {
                                 Bypass Suggested
                             </div>
                         )}
-                        <div
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${ssi < 70
-                                ? 'bg-red-500/20 text-red-400 border border-red-500/20 shadow-neon-red'
-                                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-neon-green'
-                                }`}
-                        >
-                            {ssi < 70 ? 'Caution' : 'Optimal'}
-                        </div>
+                        {isAdventureMode ? (
+                            <div className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/20"
+                                style={{ boxShadow: '0 0 8px rgba(249,115,22,0.25)' }}>
+                                🔥 Adventure
+                            </div>
+                        ) : (
+                            <div
+                                className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${ssi < 70
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/20 shadow-neon-red'
+                                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-neon-green'
+                                    }`}
+                            >
+                                {ssi < 70 ? 'Caution' : 'Optimal'}
+                            </div>
+                        )}
                         <svg
                             className={`w-3 h-3 text-white/30 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
                             fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -407,12 +456,24 @@ const TelemetryPanel = memo(() => {
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-3xl font-mono font-bold text-white tracking-tighter tabular-nums">
-                                {Math.round(ssi)}
+                                <RollingNumber value={ssi} />
                             </span>
                             <span className="text-[9px] uppercase tracking-widest text-white/40 -mt-0.5">Safety Index</span>
                         </div>
                     </div>
                 </div>
+
+                {/* Adventure Score row — only in adventure mode */}
+                {isAdventureMode && adventureScore != null && (
+                    <div className="flex items-center justify-center gap-2 mb-3 py-1.5 px-3 rounded-xl"
+                        style={{ background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(249,115,22,0.20)' }}>
+                        <span className="text-base leading-none">🔥</span>
+                        <span className="text-amber-400 font-mono text-sm font-bold tabular-nums">
+                            AS {Math.round(adventureScore)}
+                        </span>
+                        <span className="text-amber-400/70 text-[11px]">— {adventureCategory}</span>
+                    </div>
+                )}
 
                 {/* SSI + Traction Sparklines */}
                 <div className="flex items-center justify-between mb-4 px-1">
@@ -531,7 +592,7 @@ const TelemetryPanel = memo(() => {
                 className="absolute inset-x-0 bottom-0 h-[1px]"
                 style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}80, transparent)` }}
             />
-        </div>
+        </motion.div>
     );
 });
 

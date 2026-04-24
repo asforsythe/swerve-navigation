@@ -38,3 +38,6 @@ coverage/
 .eslintcache
 node_modules/
 .playwright-mcp/
+
+# Backend flat-file persistence
+.data/

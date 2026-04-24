@@ -3,7 +3,13 @@
     {
       "importance": 100,
       "path": "project-handoff/context.md",
-      "tokens": 2800,
+      "tokens": 3600,
+      "type": "context"
+    },
+    {
+      "importance": 95,
+      "path": "growth-strategy/context.md",
+      "tokens": 2200,
       "type": "context"
     },
     {
@@ -61,7 +67,7 @@
     "stubs": 0,
     "summaries": 0
   },
-  "source_fingerprint": "f64ab92",
-  "total_tokens": 7221,
+  "source_fingerprint": "phase5-adventure-route-partial-2026-04-24",
+  "total_tokens": 9421,
   "version": 2
 }
