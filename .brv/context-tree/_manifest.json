@@ -1,13 +1,19 @@
 {
   "active_context": [
     {
+      "importance": 100,
+      "path": "project-handoff/context.md",
+      "tokens": 2800,
+      "type": "context"
+    },
+    {
       "importance": 80,
       "path": "bug-fixes/context.md",
       "tokens": 420,
       "type": "context"
     },
     {
-      "importance": 50,
+      "importance": 60,
       "path": "safety-engine/context.md",
       "tokens": 317,
       "type": "context"
@@ -49,13 +55,13 @@
       "type": "context"
     }
   ],
-  "generated_at": "2026-04-22T19:00:00Z",
+  "generated_at": "2026-04-24T00:00:00Z",
   "lane_tokens": {
-    "contexts": 3951,
+    "contexts": 7221,
     "stubs": 0,
     "summaries": 0
   },
-  "source_fingerprint": "b4d09696b17e116b9471f5b22930c74d1200f1bf973909863516e5292d1098a8",
-  "total_tokens": 3951,
-  "version": 1
+  "source_fingerprint": "f64ab92",
+  "total_tokens": 7221,
+  "version": 2
 }
