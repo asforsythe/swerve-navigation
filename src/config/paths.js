@@ -6,7 +6,6 @@ const PATHS = {
   api: {
     base: '/api',
     weather: {
-      tomorrowio: '/weather/tomorrowio',
       xweather: '/weather/xweather',
       current: '/weather/current'
     },

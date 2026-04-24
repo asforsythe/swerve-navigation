@@ -32,28 +32,7 @@ class TrafficService {
     return response.json();
   }
 
-  /**
-   * Fetch traffic incidents from TomTom API
-   * @param {Array} routePoints - Array of {lat, lng} coordinates
-   * @returns {Promise<Object>} Traffic incident data
-   */
-  async fetchIncidents(routePoints) {
-    // Implementation for TomTom API
-    const url = `${PATHS.api.traffic.incidents}?points=${routePoints.map(p => `${p.lat},${p.lng}`).join(';')}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'apikey': API_CONFIG.tomtom.apiKey,
-        'Accept': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`TomTom API error: ${response.status}`);
-    }
-    
-    return response.json();
-  }
+
 }
 
 export default new TrafficService();

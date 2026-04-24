@@ -12,24 +12,6 @@ const API_CONFIG = {
     attribution: '© Mapbox © OpenStreetMap'
   },
 
-  // Tomorrow.io Weather API Configuration
-  tomorrowio: {
-    apiKey: process.env.TOMORROW_IO_API_KEY,
-    baseUrl: 'https://api.tomorrow.io/v4',
-    defaultLocation: {
-      lat: 37.7749,
-      lng: -122.4194
-    },
-    // High-resolution precipitation data settings
-    precipitation: {
-      fields: ['precipitationIntensity', 'precipitationProbability', 'weatherCode']
-    },
-    // Spatial resolution in meters
-    spatialResolution: 1000,
-    // Update frequency in milliseconds (2-5 minutes)
-    updateInterval: 300000 // 5 minutes
-  },
-
   // Xweather API Configuration
   xweather: {
     apiKey: process.env.XWEATHER_API_KEY,
@@ -59,11 +41,7 @@ const API_CONFIG = {
     apiKey: process.env.ROAD511_API_KEY
   },
 
-  // TomTom API Configuration
-  tomtom: {
-    baseUrl: 'https://api.tomtom.com',
-    apiKey: process.env.TOMTOM_API_KEY
-  }
+
 };
 
 module.exports = API_CONFIG;
