@@ -24,6 +24,9 @@ import SavedRoutesModal from './ui/SavedRoutesModal';
 import StartScreen from './ui/StartScreen';
 import LoadingOverlay from './ui/LoadingOverlay';
 import ToastContainer from './ui/ToastContainer';
+import SafetyReportPanel from './ui/SafetyReportPanel';
+import WeatherReplayPanel from './ui/WeatherReplayPanel';
+import MomentCapturedOverlay from './ui/MomentCapturedOverlay';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -571,6 +574,9 @@ const MapOverlay = () => {
             onWeatherDetail={() =>
               setUiState({ showWeatherDetail: !ui.showWeatherDetail })
             }
+            onWeatherReplay={() =>
+              setUiState({ showWeatherReplay: !ui.showWeatherReplay })
+            }
           />
 
           <WeatherLayersPanel />
@@ -622,8 +628,28 @@ const MapOverlay = () => {
       {/* Loading */}
       {isRouting && <LoadingOverlay />}
 
+      {/* Phase 2 panels */}
+      <SafetyReportPanel />
+      <WeatherReplayPanel />
+      <MomentCapturedOverlay />
+
       {/* Saved Routes Modal */}
-      {showSavedRoutes && <SavedRoutesModal onClose={() => setShowSavedRoutes(false)} speak={speak} />}
+      {showSavedRoutes && (
+        <SavedRoutesModal
+          onClose={() => setShowSavedRoutes(false)}
+          speak={speak}
+          onReplayRoute={(route) => {
+            if (route.centerLng && route.centerLat && mapRef.current) {
+              mapRef.current.flyTo({
+                center: [route.centerLng, route.centerLat],
+                zoom: 13,
+                pitch: 50,
+                duration: 1800,
+              });
+            }
+          }}
+        />
+      )}
 
       {/* Start Screen */}
       {mapLoaded && showStartButton && <StartScreen isVoiceReady={isVoiceReady} onStart={handleStartRide} />}

@@ -103,6 +103,15 @@ const useSwerveStore = create(
         stormTracker: false,
       },
 
+      // Shareable moments (captured after extreme SSI routes)
+      moments: [],
+
+      // Last completed route report (for SafetyReportPanel)
+      lastRouteReport: null,
+
+      // 24hr weather history (for WeatherReplayPanel)
+      weatherHistory: [],
+
       // UI State
       ui: {
         showTelemetry: true,
@@ -110,6 +119,9 @@ const useSwerveStore = create(
         activePanel: null,
         showWeatherLayers: false,
         showWeatherDetail: false,
+        showSafetyReport: false,
+        showWeatherReplay: false,
+        showMomentCapture: false,
       },
 
       // Actions
@@ -249,6 +261,22 @@ const useSwerveStore = create(
 
       setWeatherLayers: (layers) =>
         set({ weatherLayers: { ...get().weatherLayers, ...layers } }),
+
+      // Phase 2 actions
+      setLastRouteReport: (report) => set({ lastRouteReport: report }),
+
+      captureRouteMoment: (moment) =>
+        set({
+          moments: [
+            { ...moment, id: Date.now(), capturedAt: Date.now() },
+            ...get().moments,
+          ].slice(0, 20),
+        }),
+
+      deleteMoment: (id) =>
+        set({ moments: get().moments.filter((m) => m.id !== id) }),
+
+      setWeatherHistory: (history) => set({ weatherHistory: history }),
     }),
     {
       name: 'swerve-storage-v3',
@@ -270,6 +298,7 @@ const useSwerveStore = create(
         isMuted: state.isMuted,
         savedRoutes: state.savedRoutes,
         notificationPermission: state.notificationPermission,
+        moments: state.moments,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

@@ -10,7 +10,7 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
     const [currentRouteGeometry, setCurrentRouteGeometry] = useState(null);
     const hazardMarkersRef = useRef([]);
     const animationRef = useRef(null);
-    const { setRouteTelemetry, setModeEtas, saveRoute, weather } = useSwerveStore();
+    const { setRouteTelemetry, setModeEtas, saveRoute, weather, setLastRouteReport, captureRouteMoment, setUiState } = useSwerveStore();
 
     const clearHazardMarkers = useCallback(() => {
         hazardMarkersRef.current.forEach((m) => m.remove());
@@ -202,12 +202,46 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
 
                 speak(finalAnnouncement);
 
+                // Compute route center for map thumbnails and share cards
+                const coords = safest.geometry?.coordinates || [];
+                const midCoord = coords[Math.floor(coords.length / 2)] || null;
+
+                // Store full route report for SafetyReportPanel
+                const routeReport = {
+                    from: startLabel || 'Current Location',
+                    to: destLabel,
+                    ssi: safest.safety.ssi,
+                    category: safest.safety.category,
+                    hazardType: safest.safety.hazardType,
+                    traction: safest.safety.traction,
+                    distance: safest.distance,
+                    duration: safest.duration,
+                    centerLng: midCoord?.[0] ?? null,
+                    centerLat: midCoord?.[1] ?? null,
+                    isNight: safest.safety.isNight,
+                    timestamp: Date.now(),
+                };
+                setLastRouteReport(routeReport);
+                setUiState({ showSafetyReport: true });
+
+                // Capture moment for extreme routes
+                if (safest.safety.ssi >= 95 || safest.safety.ssi <= 60) {
+                    captureRouteMoment({
+                        ...routeReport,
+                        type: safest.safety.ssi >= 95 ? 'perfect' : 'dangerous',
+                        label: safest.safety.ssi >= 95 ? 'Perfect Run' : 'Danger Navigated',
+                    });
+                    setUiState({ showMomentCapture: true });
+                }
+
                 if (safest.safety.ssi >= 80) {
                     saveRoute({
                         id: Date.now(),
                         start: startLabel || 'Current Location',
                         dest: destLabel,
                         ssi: safest.safety.ssi,
+                        centerLng: midCoord?.[0] ?? null,
+                        centerLat: midCoord?.[1] ?? null,
                     });
                     addToast?.({ message: `Route to ${destLabel} saved`, type: 'success' });
                 }
@@ -219,7 +253,7 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
                 setIsRouting(false);
             }
         },
-        [speak, drawRoutes, saveRoute, addToast, setIsSweeping, setModeEtas]
+        [speak, drawRoutes, saveRoute, addToast, setIsSweeping, setModeEtas, setLastRouteReport, captureRouteMoment, setUiState]
     );
 
     return {

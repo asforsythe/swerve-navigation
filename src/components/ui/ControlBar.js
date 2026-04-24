@@ -1,9 +1,10 @@
 import React from 'react';
 import useSwerveStore from '../../store/useSwerveStore';
 
-const ControlBar = ({ onVoiceToggle, onThemeToggle, onSavedRoutes, onNotifications, onWeatherLayers, onWeatherDetail }) => {
+const ControlBar = ({ onVoiceToggle, onThemeToggle, onSavedRoutes, onNotifications, onWeatherLayers, onWeatherDetail, onWeatherReplay }) => {
     const { theme, isMuted, toggleMute, savedRoutes, notifications, voiceCommand, weatherLayers, ui } = useSwerveStore();
     const showWeatherDetail = ui?.showWeatherDetail ?? false;
+    const showWeatherReplay = ui?.showWeatherReplay ?? false;
     const isListening = voiceCommand?.isListening;
     const unreadCount = notifications.filter((n) => !n.read).length;
     const anyWeatherActive = Object.values(weatherLayers || {}).some(Boolean);
@@ -117,6 +118,20 @@ const ControlBar = ({ onVoiceToggle, onThemeToggle, onSavedRoutes, onNotificatio
                 </svg>
                 {showWeatherDetail && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                )}
+            </button>
+
+            {/* Weather Replay */}
+            <button
+                onClick={onWeatherReplay}
+                className={`${btnBase} ${showWeatherReplay ? 'border-violet-400/40 text-violet-300' : ''}`}
+                title="Weather Replay (24h History)"
+            >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {showWeatherReplay && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-violet-400 rounded-full animate-pulse" />
                 )}
             </button>
 
