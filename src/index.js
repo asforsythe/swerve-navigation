@@ -6,14 +6,11 @@ import App from './App';
 const root = createRoot(document.getElementById('root'));
 root.render(<App />);
 
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+// Register service worker in both dev and production — required for Web Push in dev
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
-      .then((registration) => {
-        console.log('SW registered:', registration);
-      })
-      .catch((error) => {
-        console.log('SW registration failed:', error);
-      });
+      .then((reg) => console.log('[Swerve SW] Registered:', reg.scope))
+      .catch((err) => console.warn('[Swerve SW] Registration failed:', err));
   });
 }

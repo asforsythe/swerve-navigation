@@ -587,6 +587,215 @@ function _roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// ── Push Notifications ────────────────────────────────────────────────────────
+
+let webPush;
+try {
+  webPush = require('web-push');
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webPush.setVapidDetails(
+      process.env.VAPID_EMAIL || 'mailto:admin@swerve.app',
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    console.log('[Swerve Push] VAPID configured ✓');
+  } else {
+    console.warn('[Swerve Push] VAPID keys not found in .env — push disabled. Run: node scripts/generate-vapid-keys.js');
+    webPush = null;
+  }
+} catch (e) {
+  console.warn('[Swerve Push] web-push not available:', e.message);
+  webPush = null;
+}
+
+const PUSH_SUBS_FILE = path.join(DATA_DIR, 'push-subscriptions.json');
+
+function readPushSubs() {
+  try {
+    if (!fs.existsSync(PUSH_SUBS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, 'utf8'));
+  } catch { return []; }
+}
+
+function writePushSubs(subs) {
+  fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(subs, null, 2));
+}
+
+// GET /api/push/vapid-public-key
+app.get('/api/push/vapid-public-key', (req, res) => {
+  if (!webPush || !process.env.VAPID_PUBLIC_KEY) {
+    return res.status(503).json({ error: 'Push not configured' });
+  }
+  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+});
+
+// POST /api/push/subscribe  body: { subscription, routes[] }
+app.post('/api/push/subscribe', (req, res) => {
+  if (!webPush) return res.status(503).json({ error: 'Push not configured' });
+  const { subscription, routes = [] } = req.body;
+  if (!subscription?.endpoint) return res.status(400).json({ error: 'Invalid subscription' });
+
+  const subs = readPushSubs();
+  const idx = subs.findIndex((s) => s.subscription.endpoint === subscription.endpoint);
+  const entry = {
+    id: idx >= 0 ? subs[idx].id : crypto.randomUUID(),
+    subscription,
+    routes: (routes || []).filter((r) => r.centerLat && r.centerLng).slice(0, 10),
+    lastStormAlertAt: idx >= 0 ? subs[idx].lastStormAlertAt : null,
+    lastGoldenAlertAt: idx >= 0 ? subs[idx].lastGoldenAlertAt : null,
+    subscribedAt: idx >= 0 ? subs[idx].subscribedAt : new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (idx >= 0) subs[idx] = entry;
+  else subs.push(entry);
+
+  writePushSubs(subs);
+  res.json({ ok: true });
+});
+
+// DELETE /api/push/unsubscribe  body: { endpoint }
+app.delete('/api/push/unsubscribe', (req, res) => {
+  const { endpoint } = req.body;
+  if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
+  const subs = readPushSubs().filter((s) => s.subscription.endpoint !== endpoint);
+  writePushSubs(subs);
+  res.json({ ok: true });
+});
+
+// ── Background weather checker + push scheduler ───────────────────────────────
+
+/** Simple server-side SSI from Open-Meteo — precipitation, wind, weather code */
+function serverSsiFromConditions(precipIn, gustsMph, weatherCode, tempF) {
+  let risk = 0;
+  if (precipIn > 0.20) risk += 40;
+  else if (precipIn > 0.05) risk += 25;
+  else if (precipIn > 0.01) risk += 15;
+
+  if (gustsMph > 50) risk += 30;
+  else if (gustsMph > 35) risk += 20;
+  else if (gustsMph > 25) risk += 10;
+
+  if (weatherCode >= 95) risk += 35;       // thunderstorm
+  else if (weatherCode >= 71) risk += 20;  // snow
+  else if (weatherCode >= 61) risk += 15;  // rain
+  else if (weatherCode >= 51) risk += 8;   // drizzle
+
+  // Near-freezing + precip = icing risk
+  if (tempF <= 32 && precipIn > 0.01) risk += 25;
+  else if (tempF <= 36 && precipIn > 0.01) risk += 10;
+
+  return Math.max(0, 100 - risk);
+}
+
+async function getRouteWeather(lat, lng) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+      `&current=precipitation,wind_gusts_10m,weather_code,temperature_2m` +
+      `&hourly=precipitation,wind_gusts_10m,weather_code,temperature_2m` +
+      `&forecast_days=1&timezone=auto&wind_speed_unit=mph&temperature_unit=fahrenheit&precipitation_unit=inch`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
+}
+
+async function checkAndSendAlerts() {
+  if (!webPush) return;
+  const subs = readPushSubs();
+  if (!subs.length) return;
+
+  const now = Date.now();
+  const STORM_COOLDOWN  = 60 * 60 * 1000;   // 1 hour between storm alerts
+  const GOLDEN_COOLDOWN = 2 * 60 * 60 * 1000; // 2 hours between golden alerts
+  let changed = false;
+
+  for (const sub of subs) {
+    if (!sub.routes?.length) continue;
+
+    for (const route of sub.routes) {
+      const data = await getRouteWeather(route.centerLat, route.centerLng);
+      if (!data) continue;
+
+      const c = data.current;
+      const currentSsi = serverSsiFromConditions(
+        c.precipitation || 0,
+        c.wind_gusts_10m || 0,
+        c.weather_code || 0,
+        c.temperature_2m || 70
+      );
+
+      // ── Storm alert ─────────────────────────────────────────────────────────
+      if (
+        currentSsi < 60 &&
+        (!sub.lastStormAlertAt || now - new Date(sub.lastStormAlertAt).getTime() > STORM_COOLDOWN)
+      ) {
+        const category = currentSsi < 30 ? 'Critical' : currentSsi < 55 ? 'Severe' : 'Caution';
+        const sent = await sendPushToSub(sub, {
+          title: `⚠️ Storm Alert — ${route.label || 'Your Route'}`,
+          body: `SSI dropped to ${Math.round(currentSsi)} (${category}). Consider delaying your drive.`,
+          tag: `storm-${sub.id}`,
+          url: '/',
+          requireInteraction: true,
+        });
+        if (sent) { sub.lastStormAlertAt = new Date().toISOString(); changed = true; }
+      }
+
+      // ── Golden window alert ─────────────────────────────────────────────────
+      if (!sub.lastGoldenAlertAt || now - new Date(sub.lastGoldenAlertAt).getTime() > GOLDEN_COOLDOWN) {
+        const hourly = data.hourly;
+        for (let i = 0; i < Math.min(hourly.time.length, 7); i++) {
+          const t = new Date(hourly.time[i]).getTime();
+          if (t < now + 30 * 60 * 1000) continue;   // skip windows less than 30 min away
+          if (t > now + 6 * 3600 * 1000) break;       // only look 6h ahead
+          const hourlySsi = serverSsiFromConditions(
+            hourly.precipitation[i] || 0,
+            hourly.wind_gusts_10m[i] || 0,
+            hourly.weather_code[i] || 0,
+            hourly.temperature_2m[i] || 70
+          );
+          if (hourlySsi >= 85) {
+            const hoursFromNow = Math.round((t - now) / 3600000);
+            const timeLabel = hoursFromNow <= 1 ? 'in about 1 hour' : `in ${hoursFromNow} hours`;
+            const sent = await sendPushToSub(sub, {
+              title: `⭐ Golden Window — ${route.label || 'Your Route'}`,
+              body: `Perfect conditions open ${timeLabel}. Forecast SSI: ${Math.round(hourlySsi)} (Optimal). Ride the clear window.`,
+              tag: `golden-${sub.id}`,
+              url: '/',
+            });
+            if (sent) { sub.lastGoldenAlertAt = new Date().toISOString(); changed = true; }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (changed) writePushSubs(subs);
+}
+
+async function sendPushToSub(sub, payload) {
+  try {
+    await webPush.sendNotification(sub.subscription, JSON.stringify(payload));
+    return true;
+  } catch (err) {
+    if (err.statusCode === 410 || err.statusCode === 404) {
+      // Subscription expired — remove it
+      const all = readPushSubs().filter((s) => s.id !== sub.id);
+      writePushSubs(all);
+    } else {
+      console.error('[Push] Send error:', err.message);
+    }
+    return false;
+  }
+}
+
+// Run every 15 minutes
+if (webPush) {
+  setTimeout(checkAndSendAlerts, 10000); // first check 10s after server start
+  setInterval(checkAndSendAlerts, 15 * 60 * 1000);
+}
+
 // ── HERE Traffic Incidents Proxy ──────────────────────────────────────────────
 // Key is NEVER sent to the client — all HERE requests go through this proxy.
 

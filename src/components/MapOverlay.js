@@ -31,9 +31,11 @@ import IntelligenceFeed from './ui/IntelligenceFeed';
 import HazardReportModal from './ui/HazardReportModal';
 import SwerveScorePanel from './ui/SwerveScorePanel';
 import LiveSharePanel from './ui/LiveSharePanel';
+import PushNotificationPrompt, { shouldShowPushPrompt } from './ui/PushNotificationPrompt';
 import { usePredictiveRouting } from '../hooks/usePredictiveRouting';
 import { useCommunityHazards } from '../hooks/useCommunityHazards';
 import { useLiveShare } from '../hooks/useLiveShare';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -52,6 +54,8 @@ const MapOverlay = () => {
   const [showStartButton, setShowStartButton] = useState(true);
   const [travelMode, setTravelMode] = useState('driving');
   const [routeMode, setRouteMode] = useState('safe'); // 'safe' | 'adventure'
+  const [showPushPrompt, setShowPushPrompt] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
   const [showSavedRoutes, setShowSavedRoutes] = useState(false);
   const [startAddress, setStartAddress] = useState('');
@@ -73,6 +77,17 @@ const MapOverlay = () => {
     ui,
     lastRouteReport,
   } = useSwerveStore();
+
+  // Push notifications hook
+  const { isSubscribed: pushSubscribed, isSupported: pushSupported,
+          permission: pushPermission, subscribe: pushSubscribe } = usePushNotifications();
+
+  // Show push prompt after first route (once per 7 days, not if already subscribed/denied)
+  useEffect(() => {
+    if (!lastRouteReport) return;
+    if (pushSubscribed || pushPermission === 'denied' || !pushSupported) return;
+    if (shouldShowPushPrompt()) setShowPushPrompt(true);
+  }, [lastRouteReport]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 4 live share hook (needs userLocationRef, routeTelemetry, lastRouteReport)
   const { liveShare, startShare, stopShare } = useLiveShare({
@@ -693,6 +708,27 @@ const MapOverlay = () => {
             onStop={stopShare}
           />
         </>
+      )}
+
+      {/* Phase 5 — Push notification opt-in prompt */}
+      {mapLoaded && !showStartButton && showPushPrompt && (
+        <PushNotificationPrompt
+          isSubscribing={isSubscribing}
+          onSubscribe={async () => {
+            setIsSubscribing(true);
+            const result = await pushSubscribe();
+            setIsSubscribing(false);
+            if (result?.success) {
+              addToast({ message: 'Route alerts enabled — we\'ll ping you for golden windows and storms', type: 'success', duration: 4000 });
+              setShowPushPrompt(false);
+            } else if (result?.error === 'Notification permission denied') {
+              addToast({ message: 'Enable notifications in browser settings to receive alerts', type: 'warning' });
+              setShowPushPrompt(false);
+            }
+            return result;
+          }}
+          onDismiss={() => setShowPushPrompt(false)}
+        />
       )}
 
       {/* Saved Routes Modal */}
