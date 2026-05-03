@@ -98,8 +98,8 @@ const RouteEnginePanel = ({
     const [showOptimizer, setShowOptimizer] = useState(false);
 
     const { results: predResults, isLoading: predLoading, error: predError,
-            selectedOffset, setSelectedOffset, run: runPredictive,
-            centerLat: predCenterLat, centerLng: predCenterLng } = predictive || {};
+        selectedOffset, setSelectedOffset, run: runPredictive,
+        centerLat: predCenterLat, centerLng: predCenterLng } = predictive || {};
 
     const goldenCount = useMemo(
         () => (predResults || []).filter(r => r.isGolden).length,
@@ -192,7 +192,11 @@ const RouteEnginePanel = ({
 
     return (
         <motion.div
-            className="absolute bottom-6 right-6 z-40 w-80 p-5 rounded-[24px] glass-panel"
+            className="absolute z-40 w-[min(20rem,calc(100vw_-_24px))] sm:w-80 p-5 rounded-[24px] glass-panel"
+            style={{
+                bottom: 'calc(var(--safe-bottom, 0px) + 12px)',
+                right: 'calc(var(--safe-right, 0px) + 12px)',
+            }}
             variants={slideLeft}
             initial="hidden"
             animate="visible"
@@ -249,11 +253,10 @@ const RouteEnginePanel = ({
                 <div className="flex rounded-xl overflow-hidden border border-white/[0.08] mt-1">
                     <button
                         onClick={() => setRouteMode?.('safe')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
-                            !isAdventure
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${!isAdventure
                                 ? 'bg-rose-500/90 text-white shadow-inner'
                                 : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08] hover:text-white/60'
-                        }`}
+                            }`}
                     >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -263,11 +266,10 @@ const RouteEnginePanel = ({
                     <div className="w-px bg-white/[0.08]" />
                     <button
                         onClick={() => setRouteMode?.('adventure')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${
-                            isAdventure
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold uppercase tracking-wide transition-all duration-200 ${isAdventure
                                 ? 'text-amber-300'
                                 : 'bg-white/[0.04] text-white/40 hover:bg-white/[0.08] hover:text-white/60'
-                        }`}
+                            }`}
                         style={isAdventure ? {
                             background: 'linear-gradient(135deg, rgba(217,119,6,0.4), rgba(249,115,22,0.35))',
                             boxShadow: 'inset 0 1px 0 rgba(255,200,100,0.15)',
@@ -288,7 +290,7 @@ const RouteEnginePanel = ({
                             ? '0 6px 32px rgba(249,115,22,0.55), inset 0 1px 0 rgba(255,255,255,0.20)'
                             : '0 6px 32px rgba(244,63,94,0.55), inset 0 1px 0 rgba(255,255,255,0.20)',
                     } : {}}
-                    whileTap={!isRouting  ? { scale: 0.96 } : {}}
+                    whileTap={!isRouting ? { scale: 0.96 } : {}}
                     transition={{ type: 'spring', stiffness: 500, damping: 28 }}
                     className={`group relative overflow-hidden rounded-xl py-3 text-sm font-bold text-white w-full
                         focus:outline-none
@@ -505,7 +507,13 @@ const RouteEnginePanel = ({
                                                         <div className="flex items-center justify-between">
                                                             <div>
                                                                 <p className="text-white/70 text-xs font-semibold">{r.label} departure</p>
-                                                                <p className="text-white/35 text-[10px]">{r.temp}°F · {r.precip}" precip</p>
+                                                                <p className="text-white/35 text-[10px]">
+                                                                    {r.temp}°F · {parseFloat(r.precip) >= 0.01
+                                                                        ? `${r.precip} in precip`
+                                                                        : parseFloat(r.precip) > 0
+                                                                            ? 'trace precip'
+                                                                            : 'no precip'}
+                                                                </p>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="font-bold text-lg" style={{ color: r.color }}>{r.ssi}</p>

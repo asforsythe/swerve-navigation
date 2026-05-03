@@ -13,6 +13,12 @@
       "type": "context"
     },
     {
+      "importance": 96,
+      "path": "mobile-app/context.md",
+      "tokens": 2400,
+      "type": "context"
+    },
+    {
       "importance": 80,
       "path": "bug-fixes/context.md",
       "tokens": 420,
@@ -61,13 +67,13 @@
       "type": "context"
     }
   ],
-  "generated_at": "2026-04-25T00:00:00Z",
+  "generated_at": "2026-05-03T19:30:00Z",
   "lane_tokens": {
-    "contexts": 13371,
+    "contexts": 15771,
     "stubs": 0,
     "summaries": 0
   },
-  "source_fingerprint": "phase5-brainstorm-batch-complete-2026-04-25",
-  "total_tokens": 13371,
-  "version": 2
+  "source_fingerprint": "capacitor-ios-running-option-a-mobile-redesign-2026-05-03",
+  "total_tokens": 15771,
+  "version": 4
 }

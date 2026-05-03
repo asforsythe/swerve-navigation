@@ -9,7 +9,7 @@ import { slideRight } from '../../design/motion';
 const RollingNumber = ({ value, className = '', suffix = '' }) => {
     const rounded = Math.round(value);
     const prev = useRef(rounded);
-    const dir  = rounded >= prev.current ? 1 : -1;
+    const dir = rounded >= prev.current ? 1 : -1;
     useEffect(() => { prev.current = rounded; }, [rounded]);
 
     return (
@@ -19,9 +19,9 @@ const RollingNumber = ({ value, className = '', suffix = '' }) => {
                     key={rounded}
                     custom={dir}
                     variants={{
-                        enter:  (d) => ({ y: d > 0 ? '60%' : '-60%', opacity: 0 }),
-                        center:           { y: 0, opacity: 1 },
-                        exit:   (d) => ({ y: d > 0 ? '-60%': '60%',  opacity: 0 }),
+                        enter: (d) => ({ y: d > 0 ? '60%' : '-60%', opacity: 0 }),
+                        center: { y: 0, opacity: 1 },
+                        exit: (d) => ({ y: d > 0 ? '-60%' : '60%', opacity: 0 }),
                     }}
                     initial="enter"
                     animate="center"
@@ -352,8 +352,10 @@ const TelemetryPanel = memo(() => {
 
     return (
         <motion.div
-            className="absolute top-6 left-6 z-40 w-80 rounded-[20px] glass-panel overflow-hidden cursor-pointer"
+            className="absolute z-40 w-[min(20rem,calc(100vw_-_24px))] sm:w-80 rounded-[20px] glass-panel overflow-hidden cursor-pointer"
             style={{
+                top: 'calc(var(--safe-top, 0px) + 12px)',
+                left: 'calc(var(--safe-left, 0px) + 12px)',
                 boxShadow: `0 0 0 1px ${edgeColor}, 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
                 transition: 'box-shadow 1.5s ease',
             }}
@@ -515,9 +517,13 @@ const TelemetryPanel = memo(() => {
                 <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.02] mb-3">
                     <div className="flex justify-between items-center">
                         <div>
-                            <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Precip</div>
+                            <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Precip (past hr)</div>
                             <div className="text-white font-mono text-base tabular-nums">
-                                {precipIntensity > 0 ? <>{precipIntensity.toFixed(2)} <span className="text-white/40 text-xs">in/hr</span></> : <span className="text-white/40">None</span>}
+                                {precipIntensity >= 0.01
+                                    ? <>{precipIntensity.toFixed(2)} <span className="text-white/40 text-xs">in</span></>
+                                    : precipIntensity > 0
+                                        ? <span className="text-white/60 text-sm">Trace</span>
+                                        : <span className="text-white/40">None</span>}
                             </div>
                         </div>
                         <WindCompass direction={windDirection} speed={windSpeed} gusts={windGusts} />

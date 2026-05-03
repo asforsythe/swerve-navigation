@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import useSwerveStore from '../store/useSwerveStore';
+import { uuidv4 } from '../utils/uuid';
 
 const POLL_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -28,11 +29,12 @@ const HAZARD_ICONS = {
 function getClientId() {
   let id = localStorage.getItem('swerve_client_id');
   if (!id) {
-    id = crypto.randomUUID();
+    id = uuidv4();
     localStorage.setItem('swerve_client_id', id);
   }
   return id;
 }
+
 
 export function useCommunityHazards({ mapRef, mapLoaded }) {
   const { setCommunityHazards, communityHazards, awardBadge, swerveScore, addToast } = useSwerveStore();

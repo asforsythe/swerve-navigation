@@ -60,7 +60,7 @@ const ControlBar = ({
     const levelColor = LEVEL_COLORS[Math.min(swerveScore?.level ?? 0, 4)];
 
     const btnBase = [
-        'relative p-2.5 rounded-xl overflow-hidden',
+        'relative p-2 sm:p-2.5 rounded-xl overflow-hidden',
         'bg-[#0a0a0e]/72 backdrop-blur-xl',
         'border border-white/[0.08]',
         'text-white/65 shadow-glass',
@@ -74,7 +74,11 @@ const ControlBar = ({
 
     return (
         <motion.div
-            className="absolute top-4 right-4 z-40 flex gap-2"
+            className="absolute z-40 flex flex-wrap justify-end gap-1.5 sm:gap-2 max-w-[calc(100vw_-_12px)] sm:max-w-none"
+            style={{
+                top: 'calc(var(--safe-top, 0px) + 12px)',
+                right: 'calc(var(--safe-right, 0px) + 12px)',
+            }}
             variants={barVariants}
             initial="hidden"
             animate="visible"

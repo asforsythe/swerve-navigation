@@ -18,6 +18,7 @@ import { useStormCellTracker } from '../hooks/useStormCellTracker';
 import TelemetryPanel from './ui/TelemetryPanel';
 import RouteEnginePanel from './ui/RouteEnginePanel';
 import ControlBar from './ui/ControlBar';
+import ErrorBoundary from './ui/ErrorBoundary';
 import WeatherLayersPanel from './ui/WeatherLayersPanel';
 import WeatherDetailPanel from './ui/WeatherDetailPanel';
 import SavedRoutesModal from './ui/SavedRoutesModal';
@@ -42,6 +43,17 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 mapboxgl.accessToken = MAPBOX_TOKEN;
 const DEFAULT_CENTER = [-81.3792, 28.5383];
+
+// iOS Safari (esp. iPhone 14 and earlier on iOS 16/17) crashes the WebGL
+// context reliably when Mapbox's globe projection is combined with multiple
+// raster sources + 3D buildings. Detect once so we can downgrade to mercator
+// and skip the heaviest atmosphere effects on those devices.
+const IS_IOS = typeof navigator !== 'undefined' &&
+  /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const IS_MOBILE = typeof navigator !== 'undefined' &&
+  /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const MAP_PROJECTION = IS_MOBILE ? 'mercator' : 'globe';
+
 
 const MapOverlay = () => {
   const mapContainer = useRef(null);
@@ -82,7 +94,7 @@ const MapOverlay = () => {
 
   // Push notifications hook
   const { isSubscribed: pushSubscribed, isSupported: pushSupported,
-          permission: pushPermission, subscribe: pushSubscribe } = usePushNotifications();
+    permission: pushPermission, subscribe: pushSubscribe } = usePushNotifications();
 
   // Show push prompt after first route (once per 7 days, not if already subscribed/denied)
   useEffect(() => {
@@ -442,35 +454,47 @@ const MapOverlay = () => {
 
   // Start ride
   const handleStartRide = useCallback(async () => {
-    await unlockAudio();
-    flushQueue();
+    try {
+      await unlockAudio();
+      flushQueue();
 
-    const { temp, roadTemp, precipitationIntensity } = weather.current || {};
-    const alerts =
-      weather.severeAlerts?.length > 0
-        ? `Alert: ${weather.severeAlerts[0].event}.`
-        : 'No active weather alerts.';
-    const briefing = `Swerve tracking active. Road temperature is ${roadTemp || temp} degrees. ${precipitationIntensity > 0 ? 'Light rain detected.' : 'Conditions are clear.'
-      } ${alerts} Ride safe.`;
+      const current = weather?.current || {};
+      const temp = current.temp;
+      const roadTemp = current.roadTemp;
+      const precipitationIntensity = current.precipitationIntensity;
+      const alerts =
+        weather?.severeAlerts?.length > 0
+          ? `Alert: ${weather.severeAlerts[0].event}.`
+          : 'No active weather alerts.';
+      const briefing = `Swerve tracking active. Road temperature is ${roadTemp || temp || '--'} degrees. ${precipitationIntensity > 0 ? 'Light rain detected.' : 'Conditions are clear.'
+        } ${alerts} Ride safe.`;
 
-    speak(briefing);
-    setShowStartButton(false);
+      speak(briefing);
+      setShowStartButton(false);
 
-    if (mapRef.current) {
-      const center = userLocationRef.current || mapRef.current.getCenter().toArray();
-      mapRef.current.flyTo({
-        center,
-        zoom: 15.5,
-        pitch: 60,
-        bearing: 0,
-        duration: 2500,
-        essential: true,
-      });
+      // iOS-safe: skip heavy 3D flyTo on mobile to avoid WebGL crash
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (mapRef.current && !isMobile) {
+        const center = userLocationRef.current || mapRef.current.getCenter().toArray();
+        mapRef.current.flyTo({
+          center,
+          zoom: 15.5,
+          pitch: 60,
+          bearing: 0,
+          duration: 2500,
+          essential: true,
+        });
+      }
+
+      if (!isMobile) {
+        setTimeout(() => {
+          if (mapRef.current) mapRef.current.resize();
+        }, 150);
+      }
+    } catch (err) {
+      console.error('[Swerve] Start ride error:', err);
+      setShowStartButton(false);
     }
-
-    setTimeout(() => {
-      if (mapRef.current) mapRef.current.resize();
-    }, 150);
   }, [weather, speak, unlockAudio, flushQueue]);
 
   // Map initialization - stable deps only, matching original pattern
@@ -484,8 +508,25 @@ const MapOverlay = () => {
       style: mapThemeRef.current,
       center: DEFAULT_CENTER,
       zoom: 12,
-      projection: 'globe',
+      projection: MAP_PROJECTION,
+      // iOS memory lifeline: cap pixel ratio + disable antialiasing on mobile.
+      // iPhones run at devicePixelRatio up to 3; the default Mapbox backbuffer
+      // at 3x + MSAA blows past the WebGL memory ceiling alongside all our
+      // raster overlays.
+      ...(IS_MOBILE && {
+        maxPixelRatio: 2,
+        antialias: false,
+        fadeDuration: 0,
+      }),
     });
+
+    // iOS: never pitch the map past ~45° — above that, tile pressure + 3D
+    // building extrusion frequently triggers the WebGL crash we're trying
+    // to avoid.
+    if (IS_IOS && mapRef.current.setMaxPitch) {
+      mapRef.current.setMaxPitch(45);
+    }
+
 
     mapRef.current.on('load', () => {
       console.log('[Swerve] Map loaded successfully');
@@ -576,7 +617,7 @@ const MapOverlay = () => {
 
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black">
+    <div className="relative w-full overflow-hidden bg-black" style={{ height: '100dvh' }}>
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
 
       {/* Weather particle canvas — sits above map, below all UI (z-index 11) */}
@@ -592,7 +633,7 @@ const MapOverlay = () => {
 
       {/* Controls */}
       {mapLoaded && !showStartButton && (
-        <>
+        <ErrorBoundary>
           <ControlBar
             onVoiceToggle={() => {
               const started = toggleListening();
@@ -685,7 +726,7 @@ const MapOverlay = () => {
             routeMode={routeMode}
             setRouteMode={setRouteMode}
           />
-        </>
+        </ErrorBoundary>
       )}
 
       {/* Loading */}
@@ -725,8 +766,8 @@ const MapOverlay = () => {
           }}
           className="absolute z-30 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 hover:brightness-125"
           style={{
-            bottom: '108px',
-            right: '12px',
+            bottom: 'calc(var(--safe-bottom, 0px) + 12px)',
+            left: 'calc(var(--safe-left, 0px) + 12px)',
             background: 'rgba(10,10,14,0.88)',
             border: '1px solid rgba(255,255,255,0.10)',
             backdropFilter: 'blur(16px)',

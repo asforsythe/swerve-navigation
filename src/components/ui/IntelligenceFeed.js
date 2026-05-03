@@ -175,8 +175,9 @@ export default function IntelligenceFeed({ speak, userLoc }) {
       {/* Floating toggle tab */}
       <button
         onClick={togglePanel}
-        className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.1] transition-all duration-200 hover:border-violet-400/40 hover:bg-violet-500/10 active:scale-95"
+        className="absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.1] transition-all duration-200 hover:border-violet-400/40 hover:bg-violet-500/10 active:scale-95"
         style={{
+          bottom: 'calc(var(--safe-bottom, 0px) + 64px)',
           background: show ? 'rgba(167,139,250,0.15)' : 'rgba(10,10,14,0.85)',
           backdropFilter: 'blur(16px)',
           boxShadow: show ? '0 0 20px rgba(167,139,250,0.2)' : '0 4px 20px rgba(0,0,0,0.4)',

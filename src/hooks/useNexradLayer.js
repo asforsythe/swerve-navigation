@@ -133,6 +133,7 @@ export function useNexradLayer({ mapRef, mapLoaded }) {
     // ── Visibility effect ────────────────────────────────────────────────
     useEffect(() => {
         if (!mapLoaded || !mapRef.current) return;
+        const map = mapRef.current;
 
         if (nexradVisibleRef.current) injectNexrad();
         else removeNexrad();
@@ -154,8 +155,18 @@ export function useNexradLayer({ mapRef, mapLoaded }) {
             }, REFRESH_MS);
         }
 
+        // Re-inject layers after a basemap style reload (theme toggle wipes
+        // all user-added sources/layers). Without this the radar silently
+        // disappears on theme switches.
+        const onStyleLoad = () => {
+            if (nexradVisibleRef.current) injectNexrad();
+            if (cloudVisibleRef.current) injectClouds();
+        };
+        map.on("style.load", onStyleLoad);
+
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
+            try { map.off("style.load", onStyleLoad); } catch (_) { /* map may be gone */ }
         };
     }, [isNexradVisible, isCloudVisible, mapLoaded, injectNexrad, removeNexrad, injectClouds, removeClouds, mapRef]);
 

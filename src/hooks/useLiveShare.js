@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import useSwerveStore from '../store/useSwerveStore';
+import { uuidv4 } from '../utils/uuid';
 
 // Stable client ID persisted in localStorage
 function getClientId() {
   let id = localStorage.getItem('swerve-client-id');
   if (!id) {
-    id = crypto.randomUUID();
+    id = uuidv4();
     localStorage.setItem('swerve-client-id', id);
   }
   return id;

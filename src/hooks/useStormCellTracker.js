@@ -44,7 +44,9 @@ export function useStormCellTracker({ mapRef, mapLoaded }) {
     // ── Helper callbacks (defined first to avoid stale closure issues) ─────────
 
     const syncGeoJSON = useCallback((cells) => {
-        const source = mapRef.current?.getSource(sourceId);
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded || !map.isStyleLoaded()) return;
+        const source = map.getSource(sourceId);
         if (source && typeof source.setData === "function") {
             const features = [];
             for (const c of cells) {
@@ -67,6 +69,75 @@ export function useStormCellTracker({ mapRef, mapLoaded }) {
             source.setData({ type: "FeatureCollection", features });
         }
     }, [mapRef]);
+
+    // Shared layer-setup helper — single source of truth used by mount + refresh
+    const setupLayers = useCallback(() => {
+        const map = mapRef.current;
+        if (!map || !map.isStyleLoaded || !map.isStyleLoaded()) return;
+        if (!map.getSource(sourceId)) {
+            map.addSource(sourceId, {
+                type: "geojson",
+                data: { type: "FeatureCollection", features: [] },
+            });
+        }
+        if (!map.getLayer(pathLayerId)) {
+            map.addLayer({
+                id: pathLayerId,
+                type: "line",
+                source: sourceId,
+                filter: ["==", ["get", "type"], "path"],
+                paint: {
+                    "line-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
+                    "line-width": 2,
+                    "line-dasharray": [2, 2],
+                    "line-opacity": 0.7,
+                },
+            });
+        }
+        if (!map.getLayer(layerId)) {
+            map.addLayer({
+                id: layerId,
+                type: "circle",
+                source: sourceId,
+                filter: ["==", ["get", "type"], "cell"],
+                paint: {
+                    "circle-radius": 8,
+                    "circle-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#ef4444"],
+                    "circle-opacity": 0.9,
+                    "circle-stroke-width": 2,
+                    "circle-stroke-color": "#fff",
+                },
+            });
+        }
+        if (!map.getLayer(arrowLayerId)) {
+            map.addLayer({
+                id: arrowLayerId,
+                type: "symbol",
+                source: sourceId,
+                filter: ["==", ["get", "type"], "arrow"],
+                layout: {
+                    "icon-image": "arrow",
+                    "icon-size": 0.6,
+                    "icon-rotate": ["get", "bearing"],
+                    "icon-allow-overlap": true,
+                },
+                paint: {
+                    "icon-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
+                    "icon-opacity": 0.8,
+                },
+            });
+        }
+    }, [mapRef]);
+
+    const teardownLayers = useCallback(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        if (map.getLayer(arrowLayerId)) map.removeLayer(arrowLayerId);
+        if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId);
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+    }, [mapRef]);
+
 
     const announceIntercepts = useCallback((cells) => {
         for (const c of cells) {
@@ -201,124 +272,45 @@ export function useStormCellTracker({ mapRef, mapLoaded }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [radarFrames, isVisible, mapLoaded]);
 
-    // Render GeoJSON layers
+    // Render GeoJSON layers — uses shared setup/teardown helpers, and handles
+    // Mapbox style reloads (layers get wiped when theme changes) via the
+    // `style.load` event so the tracker survives theme toggles.
     useEffect(() => {
         if (!mapLoaded || !mapRef.current) return;
         const map = mapRef.current;
-        const hasLayer = !!map.getLayer(layerId);
 
-        if (isVisible && !hasLayer) {
-            if (!map.getSource(sourceId)) {
-                map.addSource(sourceId, {
-                    type: "geojson",
-                    data: { type: "FeatureCollection", features: [] },
-                });
-            }
-            map.addLayer({
-                id: pathLayerId,
-                type: "line",
-                source: sourceId,
-                filter: ["==", ["get", "type"], "path"],
-                paint: {
-                    "line-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
-                    "line-width": 2,
-                    "line-dasharray": [2, 2],
-                    "line-opacity": 0.7,
-                },
-            });
-            map.addLayer({
-                id: layerId,
-                type: "circle",
-                source: sourceId,
-                filter: ["==", ["get", "type"], "cell"],
-                paint: {
-                    "circle-radius": 8,
-                    "circle-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#ef4444"],
-                    "circle-opacity": 0.9,
-                    "circle-stroke-width": 2,
-                    "circle-stroke-color": "#fff",
-                },
-            });
-            map.addLayer({
-                id: arrowLayerId,
-                type: "symbol",
-                source: sourceId,
-                filter: ["==", ["get", "type"], "arrow"],
-                layout: {
-                    "icon-image": "arrow",
-                    "icon-size": 0.6,
-                    "icon-rotate": ["get", "bearing"],
-                    "icon-allow-overlap": true,
-                },
-                paint: {
-                    "icon-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
-                    "icon-opacity": 0.8,
-                },
-            });
-        } else if (!isVisible && hasLayer) {
-            if (map.getLayer(arrowLayerId)) map.removeLayer(arrowLayerId);
-            if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId);
-            if (map.getLayer(layerId)) map.removeLayer(layerId);
-            if (map.getSource(sourceId)) map.removeSource(sourceId);
+        if (isVisible) {
+            setupLayers();
+            // Restore any cells that were computed before a style reload
+            if (cellsRef.current.length > 0) syncGeoJSON(cellsRef.current);
+        } else {
+            teardownLayers();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isVisible, mapLoaded]);
+
+        // Re-inject layers whenever the basemap style reloads (theme toggle)
+        const onStyleLoad = () => {
+            if (!visibleRef.current) return;
+            setupLayers();
+            if (cellsRef.current.length > 0) syncGeoJSON(cellsRef.current);
+        };
+        map.on("style.load", onStyleLoad);
+        return () => {
+            try { map.off("style.load", onStyleLoad); } catch (_) { /* map may be gone */ }
+        };
+    }, [isVisible, mapLoaded, mapRef, setupLayers, teardownLayers, syncGeoJSON]);
+
+    // Clear the announced-intercepts memo when the route changes so a new
+    // route can re-announce its own intercepts.
+    useEffect(() => {
+        announcedRef.current = new Set();
+    }, [routePath]);
 
     const refresh = useCallback(() => {
         if (!visibleRef.current || !mapRef.current) return;
-        const map = mapRef.current;
-        if (map.getLayer(arrowLayerId)) map.removeLayer(arrowLayerId);
-        if (map.getLayer(pathLayerId)) map.removeLayer(pathLayerId);
-        if (map.getLayer(layerId)) map.removeLayer(layerId);
-        if (map.getSource(sourceId)) map.removeSource(sourceId);
-        map.addSource(sourceId, {
-            type: "geojson",
-            data: { type: "FeatureCollection", features: [] },
-        });
-        map.addLayer({
-            id: pathLayerId,
-            type: "line",
-            source: sourceId,
-            filter: ["==", ["get", "type"], "path"],
-            paint: {
-                "line-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
-                "line-width": 2,
-                "line-dasharray": [2, 2],
-                "line-opacity": 0.7,
-            },
-        });
-        map.addLayer({
-            id: layerId,
-            type: "circle",
-            source: sourceId,
-            filter: ["==", ["get", "type"], "cell"],
-            paint: {
-                "circle-radius": 8,
-                "circle-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#ef4444"],
-                "circle-opacity": 0.9,
-                "circle-stroke-width": 2,
-                "circle-stroke-color": "#fff",
-            },
-        });
-        map.addLayer({
-            id: arrowLayerId,
-            type: "symbol",
-            source: sourceId,
-            filter: ["==", ["get", "type"], "arrow"],
-            layout: {
-                "icon-image": "arrow",
-                "icon-size": 0.6,
-                "icon-rotate": ["get", "bearing"],
-                "icon-allow-overlap": true,
-            },
-            paint: {
-                "icon-color": ["case", ["==", ["get", "simulated"], true], "#fbbf24", "#f43f5e"],
-                "icon-opacity": 0.8,
-            },
-        });
-        // restore data
+        teardownLayers();
+        setupLayers();
         syncGeoJSON(cellsRef.current);
-    }, [mapRef, syncGeoJSON]);
+    }, [mapRef, setupLayers, teardownLayers, syncGeoJSON]);
 
     const toggleStormTracker = useCallback(() => {
         useSwerveStore.getState().setWeatherLayer("stormTracker", !visibleRef.current);

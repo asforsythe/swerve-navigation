@@ -1,7 +1,15 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 
+// Mobile browsers (iOS Safari in particular) stutter hard when compositing
+// dozens of always-animating absolute-positioned elements on top of a
+// `backdrop-blur-xl` layer. Drop the count sharply on phones — the effect
+// still reads as "rain".
+const IS_MOBILE_UA = typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+const RAIN_COUNT = IS_MOBILE_UA ? 10 : 28;
+
 // Static rain particle data — generated once, never changes
-const RAIN_DROPS = Array.from({ length: 28 }, (_, i) => ({
+const RAIN_DROPS = Array.from({ length: RAIN_COUNT }, (_, i) => ({
     id: i,
     left: ((i * 3.7 + Math.sin(i * 2.1) * 12) % 100 + 100) % 100,
     delay: ((i * 0.19) % 2.4).toFixed(2),
@@ -11,52 +19,59 @@ const RAIN_DROPS = Array.from({ length: 28 }, (_, i) => ({
     skew: ((i % 3) - 1) * 4, // subtle angle
 }));
 
-// Self-drawing shield logo
-const AnimatedShield = ({ isReady }) => (
-    <svg
-        width="64"
-        height="64"
-        viewBox="0 0 64 64"
-        fill="none"
-        className="mx-auto mb-5"
-        aria-hidden="true"
+
+// Swerve logo mark with glow ring
+const SwerveLogoMark = ({ isReady }) => (
+    <div
+        className="mx-auto mb-5 relative flex items-center justify-center"
+        style={{
+            width: '88px',
+            height: '88px',
+        }}
     >
-        <defs>
-            <linearGradient id="shield-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#f43f5e" />
-                <stop offset="50%" stopColor="#a78bfa" />
-                <stop offset="100%" stopColor="#22d3ee" />
-            </linearGradient>
-        </defs>
-        {/* Shield body */}
-        <path
-            d="M32 5L9 15v17c0 13.8 9.8 26.7 23 30 13.2-3.3 23-16.2 23-30V15L32 5z"
-            stroke="url(#shield-grad)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="rgba(244,63,94,0.07)"
+        {/* Animated glow ring */}
+        <div
+            className="absolute inset-0 rounded-full"
             style={{
-                strokeDasharray: '175',
-                strokeDashoffset: isReady ? '0' : '175',
-                transition: 'stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                filter: 'drop-shadow(0 0 8px rgba(244,63,94,0.55))',
+                background: 'conic-gradient(from 0deg, #f43f5e, #a78bfa, #22d3ee, #a78bfa, #f43f5e)',
+                padding: '2px',
+                opacity: isReady ? 1 : 0.3,
+                transition: 'opacity 0.8s ease',
+                animation: isReady ? 'logoGlowSpin 4s linear infinite' : 'none',
+                filter: isReady ? 'blur(0.5px)' : 'none',
+            }}
+        >
+            <div className="w-full h-full rounded-full bg-black" />
+        </div>
+        {/* Logo image */}
+        <img
+            src={`${process.env.PUBLIC_URL}/swerve-logo.jpg`}
+            alt="Swerve"
+            className="absolute rounded-full object-cover"
+            style={{
+                width: '80px',
+                height: '80px',
+                top: '4px',
+                left: '4px',
+                opacity: isReady ? 1 : 0.6,
+                transform: isReady ? 'scale(1)' : 'scale(0.92)',
+                transition: 'opacity 0.6s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+                filter: isReady
+                    ? 'drop-shadow(0 0 12px rgba(167,139,250,0.45))'
+                    : 'grayscale(0.5) drop-shadow(0 0 4px rgba(0,0,0,0.6))',
             }}
         />
-        {/* Inner check */}
-        <path
-            d="M21 33l8 9 14-16"
-            stroke="url(#shield-grad)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-                strokeDasharray: '40',
-                strokeDashoffset: isReady ? '0' : '40',
-                transition: 'stroke-dashoffset 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1s',
-            }}
-        />
-    </svg>
+        {/* Pulse ring on ready */}
+        {isReady && (
+            <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                    border: '1px solid rgba(167,139,250,0.3)',
+                    animation: 'logoPulseRing 2.5s ease-out infinite',
+                }}
+            />
+        )}
+    </div>
 );
 
 // Simple typewriter hook
@@ -103,25 +118,47 @@ const StartScreen = ({ isVoiceReady, onStart }) => {
         holdStartRef.current = performance.now();
 
         const tick = (now) => {
+            if (firedRef.current || !holdStartRef.current) return;
             const p = Math.min((now - holdStartRef.current) / HOLD_MS, 1);
             setHoldProgress(p);
             if (p < 1) {
                 rafRef.current = requestAnimationFrame(tick);
-            } else {
-                firedRef.current = true;
-                setIsHolding(false);
-                onStart?.();
             }
         };
         rafRef.current = requestAnimationFrame(tick);
-    }, [isVoiceReady, onStart]);
+    }, [isVoiceReady]);
 
-    const cancelHold = useCallback(() => {
+    const endHold = useCallback(() => {
         if (firedRef.current) return;
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        setIsHolding(false);
-        setHoldProgress(0);
-    }, []);
+
+        const elapsed = holdStartRef.current ? performance.now() - holdStartRef.current : 0;
+        holdStartRef.current = null;
+
+        if (elapsed >= HOLD_MS) {
+            // Long hold (Android / desktop)
+            firedRef.current = true;
+            setIsHolding(false);
+            setHoldProgress(1);
+            onStart?.();
+        } else {
+            // Short tap (iOS fallback) — quick charge animation then start
+            firedRef.current = true;
+            let animStart = performance.now();
+            const tick = (now) => {
+                const p = Math.min((now - animStart) / 250, 1);
+                setHoldProgress(p);
+                if (p >= 1) {
+                    setIsHolding(false);
+                    onStart?.();
+                } else {
+                    rafRef.current = requestAnimationFrame(tick);
+                }
+            };
+            setIsHolding(true);
+            rafRef.current = requestAnimationFrame(tick);
+        }
+    }, [onStart]);
 
     useEffect(() => () => {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -162,7 +199,7 @@ const StartScreen = ({ isVoiceReady, onStart }) => {
                 {/* Top shimmer line */}
                 <div className="absolute inset-x-0 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-                <AnimatedShield isReady={isVoiceReady} />
+                <SwerveLogoMark isReady={isVoiceReady} />
 
                 <h2 className="text-white text-xl font-semibold tracking-tight mb-2">
                     {isVoiceReady ? 'Ready to Roll' : 'Initializing'}
@@ -179,10 +216,10 @@ const StartScreen = ({ isVoiceReady, onStart }) => {
                         {/* Hold-to-start button */}
                         <button
                             onMouseDown={startHold}
-                            onMouseUp={cancelHold}
-                            onMouseLeave={cancelHold}
-                            onTouchStart={(e) => { e.preventDefault(); startHold(); }}
-                            onTouchEnd={cancelHold}
+                            onMouseUp={endHold}
+                            onMouseLeave={endHold}
+                            onTouchStart={startHold}
+                            onTouchEnd={endHold}
                             className="group relative w-full py-3.5 rounded-2xl text-base font-bold text-white
                                 overflow-hidden cursor-pointer focus:outline-none
                                 transition-shadow duration-200"
@@ -192,6 +229,9 @@ const StartScreen = ({ isVoiceReady, onStart }) => {
                                     ? `0 0 0 2px ${ringColor}, 0 4px 32px rgba(244,63,94,0.6), 0 0 24px ${ringColor}50`
                                     : '0 4px 24px rgba(244,63,94,0.4)',
                                 transform: isHolding ? 'scale(0.98)' : undefined,
+                                WebkitTouchCallout: 'none',
+                                WebkitUserSelect: 'none',
+                                touchAction: 'manipulation',
                             }}
                             aria-label="Hold to start your ride"
                         >

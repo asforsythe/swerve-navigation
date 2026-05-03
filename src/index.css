@@ -7,10 +7,23 @@
     html,
     body,
     #root {
-        @apply w-full h-full overflow-hidden bg-black;
+        @apply w-full overflow-hidden bg-black;
+        height: 100dvh;
         font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        /* Prevent iOS rubber-band scroll and pinch-zoom of document */
+        overscroll-behavior: none;
+        -webkit-touch-callout: none;
+        touch-action: pan-x pan-y;
+    }
+
+    body {
+        /* Safe-area variables (env() falls back to 0 where unsupported) */
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-left: env(safe-area-inset-left, 0px);
+        --safe-right: env(safe-area-inset-right, 0px);
     }
 
     * {
@@ -149,6 +162,35 @@
 
 .animate-slide-in-top {
     animation: slideInTop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Logo glow ring spin */
+@keyframes logoGlowSpin {
+    from {
+        filter: blur(0.5px) hue-rotate(0deg);
+    }
+
+    to {
+        filter: blur(0.5px) hue-rotate(360deg);
+    }
+}
+
+/* Logo pulse ring */
+@keyframes logoPulseRing {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+
+    70% {
+        transform: scale(1.35);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1.35);
+        opacity: 0;
+    }
 }
 
 /* Reduced-motion overrides */
