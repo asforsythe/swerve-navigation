@@ -343,7 +343,17 @@ export const getWeatherTheme = (code) => {
         96: { description: 'Thunderstorm & Hail', color: '#f59e0b', glow: 'rgba(245,158,11,0.55)', bg: 'rgba(245,158,11,0.12)' },
         99: { description: 'Severe Thunderstorm', color: '#ef4444', glow: 'rgba(239,68,68,0.6)', bg: 'rgba(239,68,68,0.15)' },
     };
-    return themes[code] || { description: 'Unknown', color: '#94a3b8', glow: 'rgba(148,163,184,0.3)', bg: 'rgba(148,163,184,0.05)' };
+    // Fallback: if the code isn't in our map (or is null/undefined), pick the
+    // nearest mapped key in the same WMO band rather than showing "Unknown".
+    if (themes[code]) return themes[code];
+    if (code == null) return themes[0]; // No data yet → assume clear
+    const numeric = Number(code);
+    if (Number.isFinite(numeric)) {
+        const keys = Object.keys(themes).map(Number).sort((a, b) => a - b);
+        const nearest = keys.reduce((prev, k) => (Math.abs(k - numeric) < Math.abs(prev - numeric) ? k : prev), keys[0]);
+        return themes[nearest];
+    }
+    return themes[0];
 };
 
 /**

@@ -60,6 +60,12 @@ export function useRadar({ mapRef, mapLoaded }) {
                 const summaryPeriod = summaryData?.response?.[0]?.periods?.[0];
                 const roadPeriod = roadData?.response?.[0]?.periods?.[0];
 
+                // NOTE: useWeatherPolling (Open-Meteo) is the canonical source
+                // for `weatherCode` (WMO numeric) and `pressure` (hPa). XWeather
+                // returns weatherPrimaryCoded as a string ("F", "::T") and
+                // pressure in inHg, which would corrupt those fields if written
+                // directly. Convert pressure to hPa, and don't overwrite
+                // weatherCode here.
                 setWeather({
                     current: {
                         temp: p.tempF,
@@ -70,9 +76,8 @@ export function useRadar({ mapRef, mapLoaded }) {
                         humidity: p.humidity,
                         visibility: p.visibilityMI,
                         cloudCover: p.sky,
-                        weatherCode: p.weatherPrimaryCoded,
                         weather: p.weatherPrimary,
-                        pressure: p.pressureIN,
+                        pressure: p.pressureIN != null ? p.pressureIN * 33.8639 : null,
                         uvIndex: p.uvi,
                         isDay: p.isDay,
                         windDir: p.windDir,
