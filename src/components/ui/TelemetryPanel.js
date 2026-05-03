@@ -350,27 +350,15 @@ const TelemetryPanel = memo(() => {
 
     const sparkColor = ringColor;
 
-    return (
-        <motion.div
-            className="absolute z-40 w-[min(20rem,calc(100vw_-_24px))] sm:w-80 rounded-[20px] glass-panel overflow-hidden cursor-pointer"
-            style={{
-                top: 'calc(var(--safe-top, 0px) + 12px)',
-                left: 'calc(var(--safe-left, 0px) + 12px)',
-                boxShadow: `0 0 0 1px ${edgeColor}, 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
-                transition: 'box-shadow 1.5s ease',
-            }}
-            variants={slideRight}
-            initial="hidden"
-            animate="visible"
-            onClick={() => setIsExpanded((v) => !v)}
-            title="Click to expand"
-        >
-            {/* Top edge glow */}
-            <div
-                className="absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
-                style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}, transparent)` }}
-            />
+    // Mobile: pill at the top, expands into a top-slide sheet on tap.
+    // Desktop (sm+): the original glass panel docked top-left, always rendered.
+    const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
 
+    // Body content reused by both desktop panel and mobile sheet.
+    // `forceExpanded` lets the mobile sheet always show the full detail block.
+    const renderBody = (forceExpanded = false) => {
+        const showExpanded = forceExpanded || isExpanded;
+        return (
             <div className="p-5">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
@@ -540,7 +528,7 @@ const TelemetryPanel = memo(() => {
                 </div>
 
                 {/* Expanded Content */}
-                {isExpanded && (
+                {showExpanded && (
                     <div className="mt-4 pt-4 border-t border-white/[0.05] animate-fade-in-up space-y-4">
                         {/* Hourly Chart */}
                         <HourlyChart hourly={hourly} color={theme.color} />
@@ -596,13 +584,160 @@ const TelemetryPanel = memo(() => {
                     <div className="text-[9px] text-white/25 uppercase tracking-[0.15em]">Live Scan</div>
                 </div>
             </div>
+        );
+    };
 
-            {/* Bottom edge glow */}
-            <div
-                className="absolute inset-x-0 bottom-0 h-[1px]"
-                style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}80, transparent)` }}
-            />
-        </motion.div>
+    const statusBadge = isAdventureMode ? (
+        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/20">
+            🔥 Adventure
+        </span>
+    ) : (
+        <span
+            className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                ssi < 70
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/20'
+                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
+            }`}
+        >
+            {ssi < 70 ? 'Caution' : 'Optimal'}
+        </span>
+    );
+
+    return (
+        <>
+            {/* ── DESKTOP: original glass panel docked top-left ─────────────────── */}
+            <motion.div
+                className="hidden sm:block absolute z-40 w-80 rounded-[20px] glass-panel overflow-hidden cursor-pointer"
+                style={{
+                    top: 'calc(var(--safe-top, 0px) + 12px)',
+                    left: 'calc(var(--safe-left, 0px) + 12px)',
+                    boxShadow: `0 0 0 1px ${edgeColor}, 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                    transition: 'box-shadow 1.5s ease',
+                }}
+                variants={slideRight}
+                initial="hidden"
+                animate="visible"
+                onClick={() => setIsExpanded((v) => !v)}
+                title="Click to expand"
+            >
+                <div
+                    className="absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
+                    style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}, transparent)` }}
+                />
+                {renderBody(false)}
+                <div
+                    className="absolute inset-x-0 bottom-0 h-[1px]"
+                    style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}80, transparent)` }}
+                />
+            </motion.div>
+
+            {/* ── MOBILE: compact pill at the top ───────────────────────────────── */}
+            <motion.button
+                type="button"
+                onClick={() => setMobileSheetOpen(true)}
+                className="sm:hidden absolute z-40 left-3 right-3 rounded-2xl glass-panel overflow-hidden text-left active:scale-[0.98] transition-transform"
+                style={{
+                    top: 'calc(var(--safe-top, 0px) + 10px)',
+                    boxShadow: `0 0 0 1px ${edgeColor}, 0 6px 22px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                }}
+                variants={slideRight}
+                initial="hidden"
+                animate="visible"
+                aria-label="Open Telemetry"
+            >
+                <div
+                    className="absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
+                    style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}, transparent)` }}
+                />
+                <div className="flex items-center gap-3 px-3.5 py-2.5">
+                    {/* Mini SSI ring */}
+                    <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.06)" strokeWidth="10" fill="transparent" />
+                            <circle
+                                cx="50"
+                                cy="50"
+                                r="40"
+                                stroke={ringColor}
+                                strokeWidth="10"
+                                fill="transparent"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={offset}
+                                strokeLinecap="round"
+                                style={{ filter: `drop-shadow(0 0 6px ${ringGlow})`, transition: 'stroke-dashoffset 1s ease-out' }}
+                            />
+                        </svg>
+                        <span className="absolute font-mono font-bold text-[11px] text-white tabular-nums">
+                            {Math.round(ssi)}
+                        </span>
+                    </div>
+
+                    {/* Temp + condition (the Flighty hero — large weighted type) */}
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 leading-none">
+                            <span className="text-[26px] font-mono font-bold text-white tabular-nums tracking-tight">
+                                {Math.round(current.temp ?? roadTemp)}°
+                            </span>
+                            <span className="truncate text-[12px] font-medium" style={{ color: theme.color }}>
+                                {theme.description}
+                            </span>
+                        </div>
+                        <div className="text-white/30 text-[10px] mt-0.5">
+                            Feels {Math.round(current.feelsLike ?? current.temp ?? roadTemp)}° · {humidity}% RH
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                        {statusBadge}
+                        <svg className="w-3.5 h-3.5 text-white/35" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+                </div>
+            </motion.button>
+
+            {/* ── MOBILE: expanded sheet (slide down from top) ───────────────────── */}
+            <AnimatePresence>
+                {mobileSheetOpen && (
+                    <motion.div
+                        key="telemetry-sheet"
+                        className="sm:hidden fixed inset-0 z-50 flex flex-col"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    >
+                        {/* Backdrop */}
+                        <motion.div
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                            onClick={() => setMobileSheetOpen(false)}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                        />
+                        {/* Sheet */}
+                        <motion.div
+                            className="relative rounded-b-[28px] glass-panel overflow-hidden mx-2"
+                            style={{
+                                paddingTop: 'calc(var(--safe-top, 0px) + 6px)',
+                                maxHeight: 'calc(100dvh - 80px)',
+                                overflowY: 'auto',
+                                boxShadow: `0 0 0 1px ${edgeColor}, 0 12px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                            }}
+                            initial={{ y: '-100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '-100%' }}
+                            transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+                        >
+                            {/* Drag handle */}
+                            <div className="flex justify-center pt-2 pb-1">
+                                <div className="w-12 h-1 rounded-full bg-white/20" />
+                            </div>
+                            {renderBody(true)}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </>
     );
 });
 

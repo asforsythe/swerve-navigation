@@ -4,7 +4,7 @@ tags: ["mobile", "ios", "android", "capacitor", "design-language", "flighty", "m
 keywords: ["flighty", "bundle-id", "pwa", "capacitor", "native-preview", "device-preview", "bottom-sheet", "telemetry-pill"]
 related: ["project-handoff"]
 createdAt: "2026-05-03T00:00:00Z"
-updatedAt: "2026-05-03T19:30:00Z"
+updatedAt: "2026-05-03T20:05:00Z"
 ---
 
 # Swerve Mobile App
@@ -94,48 +94,76 @@ Most errors are iOS Simulator system noise (UIScene deprecation, RTIInputSystemC
 
 ---
 
-## 🔴 ACTIVE WORK — Option A: Mobile UX Redesign (Flighty-style)
+## 🔴 ACTIVE WORK — Option A: Mobile UX Redesign (Flighty-elevated)
 
-**Why:** First Simulator run revealed both `TelemetryPanel` (top-left, 320px) and `RouteEnginePanel` (bottom-right, ~60% of screen height) compete for vertical space and overlap on a 6.1" iPhone. Both panels were designed for a wide desktop canvas. Conservative shrink/safe-area pass got them visible but they still overlap.
+**Design bar (raised by user feedback 2026-05-03 19:50):** "Make it so Flighty looks mediocre next to it." Don't settle for "functional + organized." Push for: world-class typography hierarchy, single-accent color discipline that flows through entire surfaces (status-driven), no card-borders for sub-sections (typography rhythm + whitespace instead), confident hero numerals, real iOS sheet physics (rubber-band, snap points, drag handle that responds to velocity).
 
-**Roadmap (the four big moves):**
+### ✅ A1. TelemetryPanel → pill + slide-down sheet — DONE (commit pending)
+- Mobile: `<motion.button>` pill at `top: safe + 10px`, full-width minus 12px gutters, ~58px tall. Mini SSI ring (44px) + temp (26pt) + condition + status badge + chevron.
+- Tap → `<motion.div>` sheet slides down from top with full body via `renderBody(forceExpanded=true)`, framer-motion spring (damping 32, stiffness 320). Backdrop tap dismisses.
+- Desktop (`sm:` and up): unchanged — same 320px top-left glass card.
+- Body JSX extracted into `renderBody(forceExpanded)` so desktop respects original isExpanded toggle while mobile sheet always shows full detail.
+- File: `src/components/ui/TelemetryPanel.js`. Build verified clean (`npm run build` exit 0, parse OK).
 
-### A1. TelemetryPanel → compact pill, expandable
-**Current:** `w-[min(20rem,calc(100vw_-_24px))]` glass card at top-left, 280-320px tall, always expanded.
-**Target:** ~64-72px tall pill at top showing only: SSI ring + temperature + weather icon + condition word. Tap → slide-down sheet revealing the current full TelemetryPanel content. Sheet dismisses on swipe-down or tap outside.
-**Files:** `src/components/ui/TelemetryPanel.js` (split into `TelemetryPill` + `TelemetrySheet`).
-**Flighty parallel:** Flighty's compact flight pill at the top of the home screen.
+### 🟡 A1+ POLISH (deferred until after A2 to land coherently)
+On Simulator (iPhone 17 Pro), A1 works mechanically but doesn't yet match the elevated design bar. Known gaps:
+- **Color discipline.** Pill currently mixes SSI ring color + green Optimal badge + theme-tinted condition word. Should pick ONE status color (driven by SSI band: Adventure=amber, Safe=emerald, Caution=amber, Danger=red) and thread it through ring/border-glow/subtitle/badge/chevron at varying opacities. One signal, not three.
+- **Hero typography.** SSI number inside the mini ring is ~11pt, unreadable at arm's length. The 100 deserves the same prominence as the temp — both should feel hero-sized. Sheet's center "100 SAFETY INDEX" ring works but could go MUCH larger (~half screen) with the status word ("All Clear" / "Caution" / "🔥 Adventure") below in expressive type instead of a small badge.
+- **Drop bordered cards in the sheet.** Road Temp / Traction / Precip / Wind / Visibility currently each live in `bg-white/[0.03] rounded-xl border` containers. Flighty doesn't card-up data. Replace with section dividers (1px line) + typography rhythm + bigger label/value contrast.
+- **Sheet drag-down dismissal not wired.** Currently only backdrop-tap dismisses. Add `dragConstraints` + `onDragEnd` velocity check.
 
-### A2. RouteEnginePanel → bottom sheet with snap points
-**Current:** `bottom-6 right-6 w-80` glass card, fully expanded by default, contains 6+ sections.
-**Target:** Bottom sheet docked to the bottom edge, full-width on mobile. Three snap points:
-- **Peek (~88px)** — single line: "Where to?" (focuses destination input on tap)
-- **Half (~48vh)** — destination input expanded + Plan button + mode toggle (Safe/Adventure)
-- **Full (~88vh)** — all current panel content (Departure Optimizer, Live Conditions, Intelligence Feed link)
-Drag handle at top of sheet, snaps with framer-motion spring physics.
-**Files:** `src/components/ui/RouteEnginePanel.js` (will rename / split into `RouteSheet` orchestrator + `RouteSheetCompact` / `RouteSheetExpanded`).
-**Flighty parallel:** Flighty's bottom sheet for flight details (peek with summary, drag for full).
+### 🔴 A2. RouteEnginePanel → bottom sheet (elevated) — NEXT UP
+**Current:** `bottom-6 right-6 w-80` glass card, ~60% of mobile screen height, all 6+ sections always expanded (Header, Inputs, Safe/Adventure toggle, Plan button, Departure Optimizer, Live Conditions, Intelligence Feed link).
 
-### A3. ControlBar → vertical strip with overflow sheet
-**Current:** 11 horizontal buttons that wrap at top-right.
-**Target:** Vertical strip on right edge, 4-5 essential buttons stacked: Voice, Hazard Report, Swerve Score, Live Share, **More**. Tap More → bottom sheet with the rest (Mute, Theme, Trip History, Challenges, Weather Layers, Weather Detail, Weather Replay, Notifications).
-**Files:** `src/components/ui/ControlBar.js` (split into `ControlBarPrimary` vertical strip + `ControlOverflowSheet`).
+**Target — bottom sheet with 3 snap points:**
+- **Peek (~88px above safe-area):** drag handle + single-line "Where to?" pill that, when tapped, expands sheet to half. Map fully visible.
+- **Half (~50% screen, snap):** drag handle + ROUTE ENGINE header + 2 inputs (Starting Point, Destination) + Safe/Adventure toggle + full-width Plan button. Nothing else. Half-state is the working surface.
+- **Full (~90%):** drag handle + everything in Half + Departure Optimizer + Live Conditions + Intelligence Feed link.
+- Spring physics: drag handle responds to velocity, snaps to nearest point on release. Use framer-motion `drag="y"` + `dragConstraints` + `onDragEnd` deciding snap target by `info.velocity.y` and current position.
 
-### A4. Map as hero, remove blocking chrome at idle
-**Current:** Top-left telemetry + bottom-right route engine + right-edge controls + bottom-left True North + bottom-center IntelligenceFeed pill all visible simultaneously, ~60% screen blocked.
-**Target:** At idle, only the TelemetryPill (top), the RouteSheet at peek height, and the ControlBar primary strip (right edge). True North compass and Intelligence Feed pill move into the RouteSheet header bar. Map fills 80%+ of the screen.
-**Files:** `src/components/MapOverlay.js` (re-orchestrate composition; remove True North as a separate floating button, embed in RouteSheet).
+**Visual elevation (this is where the Flighty bar lands):**
+- **No card borders on sub-sections** — Departure Optimizer, Live Conditions, Mode toggle each just have a 1px hairline divider above and a 16pt section label. Whitespace separates.
+- **Status accent threading:** when a route is planned, the drag handle, the divider lines, and the "Plan Safest Route" button all pick up the SSI color. When idle (no route), neutral white/30.
+- **Plan button — confident hero treatment:** full-width, ~52px tall, font-bold 17pt, single accent (rose/red while pre-route, emerald when SSI≥80, amber when 70-80, red when <70). Subtle gradient + drop-shadow glow tied to status color.
+- **Inputs — borderless, larger:** drop the bordered `<input>` look. Use a bottom-1px hairline + bigger placeholder (15pt) + travelling shimmer on focus (already implemented). Embed location pin icon at left.
+- **Mode toggle — single segmented control** (not two side-by-side buttons). Pill background + sliding indicator (framer-motion `layoutId`).
+- **Departure Optimizer / Live Conditions** — collapse-by-default in Full state, tap label to expand. Save vertical space.
 
-**Acceptance criteria:**
-- App on iPhone 17 Pro Simulator: at idle, the map is the dominant surface; no two panels visually overlap; "Where to?" pill is reachable for thumb input; SSI is glanceable.
-- Telemetry sheet, RouteSheet, and ControlOverflowSheet all dismiss on swipe-down or backdrop tap.
-- Existing functionality preserved — every action that worked before still works after redesign.
-- Desktop layout (`sm:` breakpoint and up) still looks like the original — redesign is mobile-only.
+**Files:** `src/components/ui/RouteEnginePanel.js`. Likely 70%+ rewrite. Current 570 lines → probably ~700 with the snap-point logic + segmented control.
+
+### 🟡 BUGS to fix during A2 pass (visible in 2026-05-03 19:35 Simulator screenshot)
+- **"Unknown" weather description.** TelemetryPill subtitle shows "Unknown" because `getWeatherTheme(0).description` returns "Unknown" for code 0 (clear sky default in Open-Meteo). Fix: in `src/components/weather/WeatherIcon.js` (or wherever `getWeatherTheme` lives), make code 0 → "Clear" and add fallbacks for any unmapped code.
+- **Pressure shows "30 hPa".** Real atmospheric pressure is ~1013 hPa. The 30 is an inHg value (30.0 inHg ≈ 1013 hPa) being labeled as hPa. Bug is in either the data source (`useWeatherPolling.js`) returning inHg, or the `PressureGauge` component label. Investigate `current.pressure` source — Open-Meteo returns `surface_pressure` in hPa, so likely a different source overrode it with inHg. Fix the source, not the display.
+
+### A3. ControlBar → vertical strip + overflow sheet (after A2)
+- Vertical strip on right edge, 4-5 essential buttons stacked: Voice, Hazard Report, Swerve Score, Live Share, **More** chevron.
+- Tap More → bottom-sheet (reusing A2's snap component) with the rest (Mute, Theme, Trip History, Challenges, Weather Layers, Weather Detail, Weather Replay, Notifications).
+- Buttons: 44×44 (iOS HIG min tap target), single-accent glow per button.
+
+### A4. Map as hero — composition cleanup (final pass)
+- Idle composition on mobile: TelemetryPill (top), RouteSheet at peek (bottom), ControlBar primary strip (right edge). Map fills ~85% of screen.
+- Move True North compass + IntelligenceFeed pill INTO the RouteSheet header bar (left of drag handle).
+- Files: `src/components/MapOverlay.js` (composition only — remove True North as a separate `<button>`, embed in RouteSheet).
+
+**Acceptance criteria (overall Option A):**
+- iPhone 17 Pro Simulator at idle: map ≥ 80% of screen; no two panels visually overlap.
+- All sheets dismiss on swipe-down (velocity > threshold) or backdrop tap.
+- Status-driven accent color flows through pill + sheet + Plan button cohesively.
+- Existing functionality preserved (every action still works).
+- Desktop (sm+) layout unchanged.
+- Side-by-side with a Flighty screenshot, our typography + density holds up. Self-test: would a designer say "this looks like a 2025 native iOS app" or "this looks like a desktop website ported to a phone"? Must be the first.
 
 **What NOT to do in this pass:**
-- Don't rewrite `useRoutePlanning`, `useWeatherPolling`, or any hook. The redesign is presentational.
+- Don't rewrite `useRoutePlanning`, `useWeatherPolling`, or any hook. Presentational only.
 - Don't change SSI math, routing logic, or hazard data flow.
-- Don't redesign secondary panels (HazardReportModal, SwerveScorePanel, etc.) — they appear as full-screen modals on mobile already; they'll get their own pass later.
+- Don't redesign secondary panels (HazardReportModal, SwerveScorePanel, etc.) — they're full-screen modals on mobile already.
+
+### Iteration loop on Simulator
+After each Ax change:
+```
+npm run build && npx cap copy ios
+```
+Then in Xcode: Cmd+R to reload the app. ~10-15s round trip.
 
 ---
 

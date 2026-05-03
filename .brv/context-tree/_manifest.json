@@ -67,13 +67,13 @@
       "type": "context"
     }
   ],
-  "generated_at": "2026-05-03T19:30:00Z",
+  "generated_at": "2026-05-03T20:05:00Z",
   "lane_tokens": {
-    "contexts": 15771,
+    "contexts": 16400,
     "stubs": 0,
     "summaries": 0
   },
-  "source_fingerprint": "capacitor-ios-running-option-a-mobile-redesign-2026-05-03",
-  "total_tokens": 15771,
-  "version": 4
+  "source_fingerprint": "a1-shipped-elevated-design-bar-a2-next-2026-05-03",
+  "total_tokens": 16400,
+  "version": 5
 }
