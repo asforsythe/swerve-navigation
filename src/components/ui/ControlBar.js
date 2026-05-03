@@ -40,13 +40,16 @@ const ControlBar = ({
     onVoiceToggle, onThemeToggle, onSavedRoutes,
     onNotifications, onWeatherLayers, onWeatherDetail,
     onWeatherReplay, onHazardReport, onSwerveScore, onLiveShare,
+    onChallenges,
 }) => {
-    const { theme, isMuted, toggleMute, savedRoutes, notifications, voiceCommand, weatherLayers, ui, swerveScore, liveShare } = useSwerveStore();
+    const { theme, isMuted, toggleMute, savedRoutes, notifications, voiceCommand, weatherLayers, ui, swerveScore, liveShare, challengeProgress } = useSwerveStore();
     const showWeatherDetail = ui?.showWeatherDetail ?? false;
     const showWeatherReplay = ui?.showWeatherReplay ?? false;
     const showHazardReport  = ui?.showHazardReport  ?? false;
     const showSwerveScore   = ui?.showSwerveScore   ?? false;
     const showLiveShare     = ui?.showLiveShare     ?? false;
+    const showChallenges    = ui?.showChallenges    ?? false;
+    const completedCount    = Object.values(challengeProgress || {}).filter((p) => p?.completedAt).length;
     const isListening       = voiceCommand?.isListening;
     const unreadCount       = notifications.filter((n) => !n.read).length;
     const anyWeatherActive  = Object.values(weatherLayers || {}).some(Boolean);
@@ -155,16 +158,16 @@ const ControlBar = ({
                 </TapBtn>
             </motion.div>
 
-            {/* ── Saved Routes ── */}
+            {/* ── Trip History ── */}
             <motion.div variants={btnVariants}>
                 <TapBtn
                     onClick={onSavedRoutes}
-                    title="Saved Routes"
+                    title="Trip History"
                     accentColor="#a78bfa"
                     className={`${btnBase} ${savedRoutes.length > 0 ? 'border-violet-400/25' : ''}`}
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <AnimatePresence>
                         {savedRoutes.length > 0 && (
@@ -179,6 +182,32 @@ const ControlBar = ({
                             </motion.span>
                         )}
                     </AnimatePresence>
+                </TapBtn>
+            </motion.div>
+
+            {/* ── Challenges ── */}
+            <motion.div variants={btnVariants} className="relative">
+                <TapBtn
+                    onClick={onChallenges}
+                    title="Challenges"
+                    accentColor="#fcd34d"
+                    className={`${btnBase} ${showChallenges ? 'border-amber-300/40 text-amber-200 bg-amber-300/10' : ''}`}
+                    style={showChallenges ? { boxShadow: '0 0 16px rgba(252,211,77,0.25), 0 4px 16px rgba(0,0,0,0.3)' } : undefined}
+                >
+                    {/* Target/crosshair icon */}
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <circle cx="12" cy="12" r="3" strokeWidth={2} />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v3m0 14v3M2 12h3m14 0h3" />
+                        <circle cx="12" cy="12" r="9" strokeWidth={1.5} />
+                    </svg>
+                    {completedCount > 0 && (
+                        <span
+                            className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-black"
+                            style={{ background: '#fcd34d', boxShadow: '0 0 6px rgba(252,211,77,0.7)' }}
+                        >
+                            {completedCount}
+                        </span>
+                    )}
                 </TapBtn>
             </motion.div>
 

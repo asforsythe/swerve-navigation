@@ -134,13 +134,15 @@ const WindCompass = ({ direction = 0, speed = 0, gusts = 0 }) => {
 
 // ── Visibility Bar ─────────────────────────────────────────────────────────────
 const VisibilityBar = ({ visibility = 10 }) => {
-    const pct = Math.min(100, (visibility / 16) * 100);
-    const color = visibility >= 10 ? '#22c55e' : visibility >= 5 ? '#eab308' : '#ef4444';
+    // visibility arrives in km from useWeatherPolling — convert to miles for display
+    const visMiles = visibility * 0.621371;
+    const pct = Math.min(100, (visMiles / 10) * 100);
+    const color = visMiles >= 6 ? '#22c55e' : visMiles >= 3 ? '#eab308' : '#ef4444';
     return (
         <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
                 <span className="text-white/40 text-[9px] uppercase tracking-wider">Visibility</span>
-                <span className="text-white font-mono text-[10px] tabular-nums">{visibility.toFixed(1)} <span className="text-white/40">mi</span></span>
+                <span className="text-white font-mono text-[10px] tabular-nums">{visMiles.toFixed(1)} <span className="text-white/40">mi</span></span>
             </div>
             <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
                 <div
@@ -514,7 +516,9 @@ const TelemetryPanel = memo(() => {
                     <div className="flex justify-between items-center">
                         <div>
                             <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Precip</div>
-                            <div className="text-white font-mono text-base tabular-nums">{precipIntensity.toFixed(2)} <span className="text-white/40 text-xs">in</span></div>
+                            <div className="text-white font-mono text-base tabular-nums">
+                                {precipIntensity > 0 ? <>{precipIntensity.toFixed(2)} <span className="text-white/40 text-xs">in/hr</span></> : <span className="text-white/40">None</span>}
+                            </div>
                         </div>
                         <WindCompass direction={windDirection} speed={windSpeed} gusts={windGusts} />
                     </div>
@@ -561,7 +565,7 @@ const TelemetryPanel = memo(() => {
                             <div className="text-white/30 text-[9px] uppercase tracking-wider">Segment Analysis</div>
                             {[
                                 { label: 'Visibility', value: visibility < 3 ? 'Poor' : visibility < 6 ? 'Reduced' : 'Clear', ok: visibility >= 6 },
-                                { label: 'Road Surface', value: precipIntensity > 0.05 ? 'Wet' : precipIntensity > 0 ? 'Damp' : 'Dry', ok: precipIntensity === 0 },
+                                { label: 'Road Surface', value: precipIntensity > 0.05 ? 'Wet' : precipIntensity > 0.001 ? 'Damp' : 'Dry', ok: precipIntensity < 0.001 },
                                 { label: 'Wind Hazard', value: windSpeed > 35 ? 'Extreme' : windSpeed > 25 ? 'High' : windSpeed > 15 ? 'Moderate' : 'Low', ok: windSpeed <= 15 },
                                 { label: 'UV Exposure', value: uvIndex > 7 ? 'Very High' : uvIndex > 5 ? 'High' : uvIndex > 2 ? 'Moderate' : 'Low', ok: uvIndex <= 5 },
                             ].map(({ label, value, ok }) => (

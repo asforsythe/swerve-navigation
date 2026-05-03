@@ -63,18 +63,29 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
-const buildPath = path.join(__dirname, 'build');
-app.use(express.static(buildPath));
-
+// Cross-origin isolation headers must come before static serving so that
+// index.html and all static assets carry them — required for SharedArrayBuffer
+// (WASM multi-threading) to work in the browser.
 app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   next();
 });
 
+const buildPath = path.join(__dirname, 'build');
+app.use(express.static(buildPath));
+
+// Serve service-worker.js from public/ when it isn't in the build output
+// (e.g. during development). Without this the catch-all returns index.html
+// with content-type text/html, causing the SW registration SecurityError.
+app.get('/service-worker.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript');
+  res.sendFile(path.join(__dirname, 'public', 'service-worker.js'));
+});
+
 // ── Community Hazards API ─────────────────────────────────────────────────────
 
-const VALID_HAZARD_TYPES = ['Flooding', 'Debris', 'Accident', 'Ice', 'Construction'];
+const VALID_HAZARD_TYPES = ['Flooding', 'Debris', 'Accident', 'Ice', 'Construction', 'Pothole', 'Animal'];
 
 // GET /api/hazards?lat=&lng=&radius=  (radius in km, default 100)
 app.get('/api/hazards', (req, res) => {

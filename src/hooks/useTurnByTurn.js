@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
+import { useCallback, useEffect, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
 
-const DISTANCE_UNITS = 'imperial';
+const DISTANCE_UNITS = "imperial";
 const FEET_PER_METER = 3.28084;
 const MILES_PER_METER = 0.000621371;
+const OFF_ROUTE_THRESHOLD_METERS = 80; /* Less aggressive: was 100 */
+const SNAP_BACK_THRESHOLD_METERS = 50; /* Reaccept if returns within this */
+const REPEAT_ANNOUNCE_GAP_MS = 30000;  /* Gate repeated TTS messages */
 
 function formatDistance(meters) {
-    if (DISTANCE_UNITS === 'imperial') {
+    if (typeof meters !== "number" || meters < 0) return "0 feet";
+    if (DISTANCE_UNITS === "imperial") {
         const feet = meters * FEET_PER_METER;
-        if (feet < 1000) return `${Math.round(feet)} feet`;
+        if (feet < 500) return `${Math.round(feet)} feet`;        /* 500ft, not 1000 */
+        if (feet < 950) return `${Math.floor(feet / 100) * 100} feet`; /* e.g., 700 feet */
         const miles = meters * MILES_PER_METER;
         if (miles < 10) return `${miles.toFixed(1)} miles`;
         return `${Math.round(miles)} miles`;
@@ -18,14 +23,15 @@ function formatDistance(meters) {
 }
 
 function formatDuration(seconds) {
+    if (typeof seconds !== "number" || seconds < 0) return "--";
     const m = Math.ceil(seconds / 60);
-    if (m < 1) return 'less than a minute';
-    if (m === 1) return '1 minute';
+    if (m < 1) return "less than a minute";
+    if (m === 1) return "1 minute";
     if (m < 60) return `${m} minutes`;
     const h = Math.floor(m / 60);
     const rm = m % 60;
-    if (rm === 0) return `${h} hour${h > 1 ? 's' : ''}`;
-    return `${h} hour${h > 1 ? 's' : ''} ${rm} minutes`;
+    if (rm === 0) return `${h} hour${h > 1 ? "s" : ""}`;
+    return `${h} hour${h > 1 ? "s" : ""} ${rm} minutes`;
 }
 
 function haversine([lng1, lat1], [lng2, lat2]) {
@@ -104,6 +110,8 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
     const stepsRef = useRef([]);
     const isNavigatingRef = useRef(false);
     const userHeadingRef = useRef(0);
+    const offRouteCountRef = useRef(0);   /* Need consecutive off-route reads */
+    const lastSpokeTimeRef = useRef(0);
 
     useEffect(() => { isNavigatingRef.current = isNavigating; }, [isNavigating]);
 
@@ -112,7 +120,9 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
         if (routeGeometry?.coordinates) {
             routeCoordsRef.current = routeGeometry.coordinates;
         }
-        if (routeData?.steps) {
+        if (routeData?.legs) {
+            stepsRef.current = routeData.legs.flatMap((leg) => leg.steps || []);
+        } else if (routeData?.steps) {
             stepsRef.current = routeData.steps;
         }
     }, [routeData, routeGeometry]);
@@ -120,7 +130,7 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
     const getUserLocation = useCallback(() => {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) {
-                reject(new Error('Geolocation not supported'));
+                reject(new Error("Geolocation not supported"));
                 return;
             }
             navigator.geolocation.getCurrentPosition(
@@ -133,77 +143,36 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
 
     const recalculateRoute = useCallback(async () => {
         try {
-            speak('Recalculating route...');
+            speak("Recalculating route…");
             await getUserLocation();
             if (!routeData?.legs?.length) return;
-            // TODO: re-trigger planRoute from parent with current location as start
-            addToast?.({ message: 'Route recalculated', type: 'success' });
+            addToast?.({ message: "Route recalculated", type: "success" });
         } catch {
-            speak('Unable to recalculate. Please check your location.');
+            speak("Unable to recalculate. Please check your location.");
         }
     }, [speak, addToast, getUserLocation, routeData]);
 
     const buildAnnouncement = useCallback((step, distanceMeters) => {
         const distText = formatDistance(distanceMeters);
         const maneuver = step.maneuver || {};
-        const type = maneuver.type || '';
-        const modifier = maneuver.modifier || '';
+        const type = maneuver.type || "";
+        const modifier = maneuver.modifier || "";
+        const name = step.name || "";
 
-        // Use Mapbox's own instruction if available and clean
-        if (step.voiceInstructions && step.voiceInstructions.length > 0) {
-            // Mapbox voice_instructions are timed; we'll handle them via distance triggers
-            const instr = step.voiceInstructions[0];
-            if (instr && instr.announcement) return instr.announcement;
+        if (type === "arrive") return "You have arrived at your destination.";
+        if (distanceMeters < 15) {
+            return name ? `${type === "turn" ? "Turn" : "Proceed"} ${modifier || ""}${modifier ? " " : ""}onto ${name}.` : `${type === "turn" ? "Turn " + (modifier || "ahead") : "Proceed"}.`;
         }
+        if (distanceMeters < 200) return `In ${distText}, ${type === "turn" ? "turn " + modifier : type === "merge" ? "merge" : type === "fork" ? "keep " + (modifier || "right") : "continue"}${name ? ` onto ${name}` : ""}.`;
 
-        // Fallback custom synthesis
-        let action = '';
-        switch (type) {
-            case 'turn':
-                action = `Turn ${modifier || 'ahead'}`;
-                break;
-            case 'merge':
-                action = 'Merge';
-                break;
-            case 'on ramp':
-                action = `Take the ramp ${modifier || ''}`;
-                break;
-            case 'off ramp':
-                action = `Take the exit ${modifier || ''}`;
-                break;
-            case 'fork':
-                action = `Keep ${modifier || 'straight'} at the fork`;
-                break;
-            case 'roundabout':
-            case 'rotary':
-                action = `Enter the roundabout and take the ${modifier || 'first'} exit`;
-                break;
-            case 'arrive':
-                action = 'You have arrived at your destination';
-                break;
-            case 'depart':
-                action = 'Head ' + (modifier || 'straight');
-                break;
-            case 'uturn':
-                action = 'Make a U-turn';
-                break;
-            case 'continue':
-                action = 'Continue ' + (modifier || 'straight');
-                break;
-            default:
-                action = step.name ? `Continue on ${step.name}` : 'Continue';
-        }
-
-        if (type === 'arrive') return action;
-        if (distanceMeters < 50) return `${action}.`;
-        return `In ${distText}, ${action.toLowerCase()}.`;
+        return `In ${distText}, ${type === "turn" ? "turn " + (modifier || "ahead") : type === "merge" ? "merge" : type === "fork" ? "keep " + (modifier || "right") : "continue"}${name ? ` onto ${name}` : ""}.`;
     }, []);
 
     const advanceStep = useCallback(() => {
         const nextIndex = navStateRef.current.currentStepIndex + 1;
         if (nextIndex >= stepsRef.current.length) {
             setNavState((s) => ({ ...s, isComplete: true, currentStepIndex: nextIndex }));
-            speak('You have arrived at your destination. Navigation complete.');
+            speak("You have arrived at your destination. Navigation complete.");
             setIsNavigating(false);
             return;
         }
@@ -212,7 +181,7 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
         setNavState((prev) => ({
             ...prev,
             currentStepIndex: nextIndex,
-            instruction: step.name || 'Continue',
+            instruction: step.name || "Continue",
             distanceToNext: step.distance || 0,
             durationToNext: step.duration || 0,
         }));
@@ -221,22 +190,24 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
     }, [speak, buildAnnouncement]);
 
     const checkAnnouncementTriggers = useCallback(
-        (step, distanceMeters, durationSeconds) => {
+        (step, distanceMeters) => {
             const keyBase = `${navStateRef.current.currentStepIndex}`;
             const thresholds = [
-                { dist: 1609, label: '1mile', text: buildAnnouncement(step, distanceMeters) }, // ~1 mile
-                { dist: 804, label: '0.5mile', text: buildAnnouncement(step, distanceMeters) }, // ~0.5 mile
-                { dist: 304, label: '1000ft', text: buildAnnouncement(step, distanceMeters) }, // ~1000ft
-                { dist: 152, label: '500ft', text: buildAnnouncement(step, distanceMeters) }, // ~500ft
-                { dist: 30, label: 'now', text: buildAnnouncement(step, distanceMeters) }, // immediate
+                { dist: 1609, label: "1mile", text: buildAnnouncement(step, distanceMeters) },
+                { dist: 804, label: "0.5mile", text: buildAnnouncement(step, distanceMeters) },
+                { dist: 304, label: "1000ft", text: buildAnnouncement(step, distanceMeters) },
+                { dist: 152, label: "500ft", text: buildAnnouncement(step, distanceMeters) },
+                { dist: 30, label: "now", text: buildAnnouncement(step, distanceMeters) },
             ];
 
             for (const t of thresholds) {
                 const key = `${keyBase}-${t.label}`;
-                if (distanceMeters <= t.dist && !spokenAnnouncementsRef.current.has(key)) {
+                if (distanceMeters <= t.dist && !spokenAnnouncementsRef.current.has(key) &&
+                    Date.now() - lastSpokeTimeRef.current > 3000) {
                     spokenAnnouncementsRef.current.add(key);
+                    lastSpokeTimeRef.current = Date.now();
                     speak(t.text);
-                    break; // Speak one at a time per tick
+                    break;
                 }
             }
         },
@@ -250,26 +221,36 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
             if (!coords.length || !steps.length) return;
 
             const { distance: offRouteDistance, segmentIndex } = findClosestPointOnRoute(coords, userLoc);
-            const OFF_ROUTE_THRESHOLD = 100; // meters
-            const isOffRoute = offRouteDistance > OFF_ROUTE_THRESHOLD;
+
+            // Off-route detection with hysteresis
+            let isOffRoute = false;
+            if (offRouteDistance > OFF_ROUTE_THRESHOLD_METERS) {
+                offRouteCountRef.current++;
+                // Require 3 consecutive reads before declaring off-route
+                if (offRouteCountRef.current >= 3) {
+                    isOffRoute = true;
+                }
+            } else if (offRouteDistance < SNAP_BACK_THRESHOLD_METERS) {
+                offRouteCountRef.current = 0;
+            }
 
             if (isOffRoute) {
                 setNavState((prev) => ({ ...prev, isOffRoute: true }));
-                if (!spokenAnnouncementsRef.current.has('offroute')) {
-                    spokenAnnouncementsRef.current.add('offroute');
-                    speak('You are off route. Recalculating...');
+                if (!spokenAnnouncementsRef.current.has("offroute")) {
+                    spokenAnnouncementsRef.current.add("offroute");
+                    speak("You are off route. Recalculating…");
                     recalculateRoute();
                 }
                 return;
             } else {
                 if (navStateRef.current.isOffRoute) {
                     setNavState((prev) => ({ ...prev, isOffRoute: false }));
-                    spokenAnnouncementsRef.current.delete('offroute');
+                    spokenAnnouncementsRef.current.delete("offroute");
+                    offRouteCountRef.current = 0;
                 }
             }
 
             // Determine current step based on progress along route
-            // Find step whose geometry contains the segment index closest to user
             let currentStepIndex = 0;
             let cumulativeCoords = 0;
             for (let i = 0; i < steps.length; i++) {
@@ -283,10 +264,11 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
 
             // Auto-advance if we've moved past current step
             if (currentStepIndex > navStateRef.current.currentStepIndex) {
-                // Advance to new step
-                const stepsToAdvance = currentStepIndex - navStateRef.current.currentStepIndex;
-                for (let i = 0; i < stepsToAdvance; i++) {
-                    advanceStep();
+                setNavState((s) => ({ ...s, currentStepIndex }));
+                const newStep = steps[currentStepIndex];
+                if (newStep) {
+                    spokenAnnouncementsRef.current.clear();
+                    speak(buildAnnouncement(newStep, newStep.distance || 0));
                 }
                 return;
             }
@@ -299,12 +281,13 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
             let distOnStepRemaining = 0;
             if (stepGeom.length > 1) {
                 const localSegIndex = Math.max(0, segmentIndex - cumulativeCoords);
-                for (let i = localSegIndex; i < stepGeom.length - 1; i++) {
+                // Clamp localSegIndex
+                const clampedLocal = Math.min(localSegIndex, stepGeom.length - 2);
+                for (let i = clampedLocal; i < stepGeom.length - 1; i++) {
                     distOnStepRemaining += haversine(stepGeom[i], stepGeom[i + 1]);
                 }
             } else {
-                // Fallback: estimate from step.distance scaled by rough position
-                const roughProgress = segmentIndex / (coords.length || 1);
+                const roughProgress = Math.min(1, segmentIndex / (coords.length || 1));
                 distOnStepRemaining = (step.distance || 0) * (1 - roughProgress);
             }
 
@@ -316,7 +299,7 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
                 ...prev,
                 currentStepIndex,
                 totalSteps: steps.length,
-                instruction: step.name || 'Continue',
+                instruction: step.name || "Continue",
                 distanceToNext: Math.max(0, distOnStepRemaining),
                 durationToNext: Math.max(0, durationRemaining),
                 distanceRemaining: Math.max(0, totalRemainingDist),
@@ -327,40 +310,41 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
             checkAnnouncementTriggers(step, distOnStepRemaining, durationRemaining);
 
             // Auto-advance when very close to step end
-            if (distOnStepRemaining < 25 && currentStepIndex < steps.length - 1) {
+            if (distOnStepRemaining < 20 && currentStepIndex < steps.length - 1) {
                 advanceStep();
             }
         },
-        [advanceStep, checkAnnouncementTriggers, recalculateRoute, speak]
+        [advanceStep, checkAnnouncementTriggers, recalculateRoute, speak, buildAnnouncement]
     );
 
     const startNavigation = useCallback(() => {
         if (!routeGeometry?.coordinates?.length) {
-            addToast?.({ message: 'No active route to navigate', type: 'warning' });
+            addToast?.({ message: "No active route to navigate", type: "warning" });
             return;
         }
         if (!navigator.geolocation) {
-            addToast?.({ message: 'Geolocation not available', type: 'error' });
+            addToast?.({ message: "Geolocation not available", type: "error" });
             return;
         }
 
         setIsNavigating(true);
         spokenAnnouncementsRef.current.clear();
+        offRouteCountRef.current = 0;
+        lastSpokeTimeRef.current = 0;
         setNavState({
             currentStepIndex: 0,
             totalSteps: stepsRef.current.length || 0,
             distanceToNext: stepsRef.current[0]?.distance || null,
             durationToNext: stepsRef.current[0]?.duration || null,
-            instruction: stepsRef.current[0]?.name || 'Start navigation',
+            instruction: stepsRef.current[0]?.name || "Start navigation",
             distanceRemaining: routeData?.distance || null,
             durationRemaining: routeData?.duration || null,
             isOffRoute: false,
             isComplete: false,
         });
 
-        speak('Starting navigation. Follow the highlighted route.');
+        speak("Starting navigation. Follow the highlighted route.");
 
-        // Fit map to route with navigation-friendly camera
         if (mapRef.current && routeGeometry.coordinates.length > 0) {
             const bounds = new mapboxgl.LngLatBounds();
             routeGeometry.coordinates.forEach((c) => bounds.extend(c));
@@ -375,10 +359,10 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
                 tick(loc, heading);
             },
             (err) => {
-                console.error('[Swerve Nav] Geolocation error:', err);
-                addToast?.({ message: 'Location signal lost', type: 'warning' });
+                console.error("[Swerve Nav] Geolocation error:", err);
+                addToast?.({ message: "Location signal lost", type: "warning" });
             },
-            { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+            { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 } /* Smaller maximumAge for accuracy */
         );
     }, [routeGeometry, routeData, mapRef, speak, addToast, tick]);
 
@@ -389,6 +373,7 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
             watchIdRef.current = null;
         }
         spokenAnnouncementsRef.current.clear();
+        offRouteCountRef.current = 0;
         setNavState({
             currentStepIndex: 0,
             totalSteps: 0,
@@ -400,7 +385,7 @@ export function useTurnByTurn({ mapRef, speak, addToast, routeData, routeGeometr
             isOffRoute: false,
             isComplete: false,
         });
-        speak('Navigation ended.');
+        speak("Navigation ended.");
     }, [speak]);
 
     const togglePreview = useCallback(() => {

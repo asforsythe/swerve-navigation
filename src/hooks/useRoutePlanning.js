@@ -13,7 +13,7 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
     const hazardMarkersRef = useRef([]);
     const animationRef = useRef(null);
     const routeLineRef = useRef(null); // cinema RouteLine instance
-    const { setRouteTelemetry, setModeEtas, saveRoute, weather, setLastRouteReport, captureRouteMoment, setUiState, awardRoutePoints } = useSwerveStore();
+    const { setRouteTelemetry, setModeEtas, saveRoute, weather, setLastRouteReport, captureRouteMoment, setUiState, awardRoutePoints, updateChallengeProgress } = useSwerveStore();
 
     const clearHazardMarkers = useCallback(() => {
         hazardMarkersRef.current.forEach((m) => m.remove());
@@ -268,6 +268,21 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
                     addToast?.({ message: `Route to ${destLabel} saved`, type: 'success' });
                 }
 
+                // Update challenge progress
+                const challengeResult = updateChallengeProgress({
+                    ssi: primary.safety.ssi,
+                    isAdventureMode: isAdventure,
+                });
+                if (challengeResult?.newlyCompleted?.length) {
+                    challengeResult.newlyCompleted.forEach((c) => {
+                        addToast?.({
+                            message: `Challenge complete: ${c.name} ${c.icon}`,
+                            type: 'success',
+                            duration: 5000,
+                        });
+                    });
+                }
+
                 // Award points (adventure mode earns a bonus)
                 const pointResult = awardRoutePoints({
                     ssi: primary.safety.ssi,
@@ -303,7 +318,7 @@ export function useRoutePlanning({ mapRef, speak, addToast, setIsSweeping }) {
                 setIsRouting(false);
             }
         },
-        [speak, drawRoutes, saveRoute, addToast, setIsSweeping, setModeEtas, setLastRouteReport, captureRouteMoment, setUiState, awardRoutePoints, setRouteTelemetry]
+        [speak, drawRoutes, saveRoute, addToast, setIsSweeping, setModeEtas, setLastRouteReport, captureRouteMoment, setUiState, awardRoutePoints, updateChallengeProgress, setRouteTelemetry]
     );
 
     return {

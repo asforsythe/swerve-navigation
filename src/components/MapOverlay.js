@@ -32,6 +32,8 @@ import HazardReportModal from './ui/HazardReportModal';
 import SwerveScorePanel from './ui/SwerveScorePanel';
 import LiveSharePanel from './ui/LiveSharePanel';
 import PushNotificationPrompt, { shouldShowPushPrompt } from './ui/PushNotificationPrompt';
+import ChallengesPanel from './ui/ChallengesPanel';
+import InsuranceReportModal from './ui/InsuranceReportModal';
 import { usePredictiveRouting } from '../hooks/usePredictiveRouting';
 import { useCommunityHazards } from '../hooks/useCommunityHazards';
 import { useLiveShare } from '../hooks/useLiveShare';
@@ -628,6 +630,9 @@ const MapOverlay = () => {
             onLiveShare={() =>
               setUiState({ showLiveShare: !ui.showLiveShare, showSwerveScore: false })
             }
+            onChallenges={() =>
+              setUiState({ showChallenges: !ui.showChallenges })
+            }
           />
 
           <WeatherLayersPanel />
@@ -709,6 +714,41 @@ const MapOverlay = () => {
           />
         </>
       )}
+
+      {/* Phase 5 — True North / Recenter button */}
+      {mapLoaded && !showStartButton && (
+        <button
+          onClick={() => {
+            if (!mapRef.current) return;
+            const center = userLocationRef.current || mapRef.current.getCenter().toArray();
+            mapRef.current.flyTo({ center, bearing: 0, pitch: 60, zoom: 15.5, duration: 1500, essential: true });
+          }}
+          className="absolute z-30 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 hover:brightness-125"
+          style={{
+            bottom: '108px',
+            right: '12px',
+            background: 'rgba(10,10,14,0.88)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.45)',
+          }}
+          title="True North — recenter map"
+          aria-label="Recenter map facing north"
+        >
+          {/* Compass needle: red = North, white = South */}
+          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+            <path d="M12 3 L14 10 L12 11.5 L10 10 Z" fill="#ef4444" />
+            <path d="M12 21 L10 14 L12 12.5 L14 14 Z" fill="rgba(255,255,255,0.35)" />
+            <circle cx="12" cy="12" r="1.8" fill="rgba(255,255,255,0.55)" />
+          </svg>
+        </button>
+      )}
+
+      {/* Phase 5 — Challenges panel */}
+      {mapLoaded && !showStartButton && <ChallengesPanel />}
+
+      {/* Phase 5 — Insurance / Safe Driver report */}
+      {mapLoaded && !showStartButton && <InsuranceReportModal />}
 
       {/* Phase 5 — Push notification opt-in prompt */}
       {mapLoaded && !showStartButton && showPushPrompt && (

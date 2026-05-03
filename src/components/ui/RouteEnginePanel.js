@@ -505,7 +505,7 @@ const RouteEnginePanel = ({
                                                         <div className="flex items-center justify-between">
                                                             <div>
                                                                 <p className="text-white/70 text-xs font-semibold">{r.label} departure</p>
-                                                                <p className="text-white/35 text-[10px]">{r.temp}°F · {r.precip}mm precip</p>
+                                                                <p className="text-white/35 text-[10px]">{r.temp}°F · {r.precip}" precip</p>
                                                             </div>
                                                             <div className="text-right">
                                                                 <p className="font-bold text-lg" style={{ color: r.color }}>{r.ssi}</p>

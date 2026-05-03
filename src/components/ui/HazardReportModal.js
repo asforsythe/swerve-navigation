@@ -4,10 +4,12 @@ import useSwerveStore from '../../store/useSwerveStore';
 
 const HAZARD_TYPES = [
   { key: 'Flooding',     icon: '🌊', color: '#3b82f6', label: 'Flooding'     },
-  { key: 'Debris',       icon: '🪨', color: '#fbbf24', label: 'Debris'       },
+  { key: 'Debris',       icon: '🍂', color: '#fbbf24', label: 'Leaves/Debris'},
   { key: 'Accident',     icon: '💥', color: '#f43f5e', label: 'Accident'     },
   { key: 'Ice',          icon: '🧊', color: '#22d3ee', label: 'Ice'          },
   { key: 'Construction', icon: '🚧', color: '#f97316', label: 'Construction' },
+  { key: 'Pothole',      icon: '🕳️', color: '#a78bfa', label: 'Pothole'      },
+  { key: 'Animal',       icon: '🦌', color: '#34d399', label: 'Animal'       },
 ];
 
 export default function HazardReportModal({ reportHazard, userLoc }) {
@@ -83,7 +85,7 @@ export default function HazardReportModal({ reportHazard, userLoc }) {
             </div>
 
             {/* Type selector */}
-            <div className="grid grid-cols-5 gap-2 mb-4">
+            <div className="grid grid-cols-4 gap-2 mb-4">
               {HAZARD_TYPES.map(({ key, icon, color, label }) => (
                 <button
                   key={key}

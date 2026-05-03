@@ -10,14 +10,18 @@ const HAZARD_COLORS = {
   Accident:     '#f43f5e', // rose
   Ice:          '#22d3ee', // cyan
   Construction: '#f97316', // orange
+  Pothole:      '#a78bfa', // violet
+  Animal:       '#34d399', // emerald
 };
 
 const HAZARD_ICONS = {
   Flooding:     '🌊',
-  Debris:       '🪨',
+  Debris:       '🍂',
   Accident:     '💥',
   Ice:          '🧊',
   Construction: '🚧',
+  Pothole:      '🕳️',
+  Animal:       '🦌',
 };
 
 // Persistent client ID (owner tracking)

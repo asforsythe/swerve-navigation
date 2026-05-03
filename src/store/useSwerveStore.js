@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { CHALLENGES, isChallengeAvailable } from '../data/challenges';
 
 const useSwerveStore = create(
   persist(
@@ -139,6 +140,10 @@ const useSwerveStore = create(
         goldenDepartures: 0,
       },
 
+      // Phase 5: Challenge progress
+      // { [challengeId]: { count, completedAt, entries: [{ts, ssi}] } }
+      challengeProgress: {},
+
       // Phase 4: Live route share ("Track My Drive")
       liveShare: {
         id: null,
@@ -168,8 +173,10 @@ const useSwerveStore = create(
         showIntelligenceFeed: false,
         showHazardReport: false,
         showPredictiveRouting: false,
-        showSwerveScore: false,  // Phase 4: score panel
-        showLiveShare: false,    // Phase 4: Track My Drive
+        showSwerveScore: false,       // Phase 4: score panel
+        showLiveShare: false,         // Phase 4: Track My Drive
+        showChallenges: false,        // Phase 5: challenges panel
+        showInsuranceReport: false,   // Phase 5: insurance report
       },
 
       // Actions
@@ -434,6 +441,45 @@ const useSwerveStore = create(
         return { earned, leveledUp, newLevel, newBadgeIds };
       },
 
+      // Phase 5: update challenge progress after a route
+      updateChallengeProgress: ({ ssi, isAdventureMode }) => {
+        const progress = { ...get().challengeProgress };
+        const now = new Date();
+        const newlyCompleted = [];
+
+        CHALLENGES.forEach((challenge) => {
+          // Only available challenges in the current calendar window
+          if (!isChallengeAvailable(challenge)) return;
+          // Already completed — skip
+          if (progress[challenge.id]?.completedAt) return;
+          // Does this route qualify?
+          if (!challenge.check({ ssi, isAdventureMode })) return;
+
+          const current = progress[challenge.id] || { count: 0, entries: [] };
+          const newEntry = { ts: now.toISOString(), ssi };
+
+          let entries = [...current.entries, newEntry];
+
+          // For windowed challenges, only count entries within the time window
+          if (challenge.windowDays) {
+            const cutoff = new Date(now.getTime() - challenge.windowDays * 86400000);
+            entries = entries.filter((e) => new Date(e.ts) > cutoff);
+          }
+
+          const newCount = entries.length;
+          const completedAt = newCount >= challenge.target ? now.toISOString() : null;
+
+          if (completedAt && !current.completedAt) {
+            newlyCompleted.push(challenge);
+          }
+
+          progress[challenge.id] = { count: newCount, entries, completedAt };
+        });
+
+        set({ challengeProgress: progress });
+        return { newlyCompleted };
+      },
+
       // Phase 4: live share state
       setLiveShare: (data) =>
         set((state) => ({ liveShare: { ...state.liveShare, ...data } })),
@@ -458,30 +504,25 @@ const useSwerveStore = create(
       setWeatherHistory: (history) => set({ weatherHistory: history }),
     }),
     {
-      name: 'swerve-storage-v4',
-      version: 4,
+      name: 'swerve-storage-v5',
+      version: 5,
       migrate: (persistedState, version) => {
         let state = persistedState;
         if (version < 3) {
           state = { ...state, mapTheme: 'mapbox://styles/mapbox/dark-v11', theme: 'dark' };
         }
         if (version < 4) {
-          // Merge new swerveScore fields on top of any existing total/badges
           state = {
             ...state,
             swerveScore: {
-              level: 0,
-              currentStreak: 0,
-              longestStreak: 0,
-              lastRouteDate: null,
-              weeklyPoints: 0,
-              weekStart: null,
-              totalRoutes: 0,
-              safeRoutes: 0,
-              goldenDepartures: 0,
+              level: 0, currentStreak: 0, longestStreak: 0, lastRouteDate: null,
+              weeklyPoints: 0, weekStart: null, totalRoutes: 0, safeRoutes: 0, goldenDepartures: 0,
               ...(state.swerveScore || {}),
             },
           };
+        }
+        if (version < 5) {
+          state = { ...state, challengeProgress: {} };
         }
         return state;
       },
@@ -493,6 +534,7 @@ const useSwerveStore = create(
         notificationPermission: state.notificationPermission,
         moments: state.moments,
         swerveScore: state.swerveScore,
+        challengeProgress: state.challengeProgress,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {

@@ -38,7 +38,7 @@ function MapThumb({ route }) {
 }
 
 export default function SavedRoutesModal({ onClose, speak, onReplayRoute }) {
-  const { savedRoutes, deleteRoute } = useSwerveStore();
+  const { savedRoutes, deleteRoute, setUiState } = useSwerveStore();
   const [compareIds, setCompareIds] = useState([]);
   const [showCompare, setShowCompare]   = useState(false);
 
@@ -76,7 +76,7 @@ export default function SavedRoutesModal({ onClose, speak, onReplayRoute }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-white/[0.06]">
           <div>
-            <h3 className="text-white text-base font-semibold">Saved Routes</h3>
+            <h3 className="text-white text-base font-semibold">Trip History</h3>
             <p className="text-white/30 text-xs mt-0.5">{savedRoutes.length} route{savedRoutes.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -273,6 +273,24 @@ export default function SavedRoutesModal({ onClose, speak, onReplayRoute }) {
             </div>
           )}
         </div>
+
+        {/* Insurance Report CTA */}
+        {savedRoutes.length > 0 && (
+          <div className="px-4 pb-4">
+            <button
+              onClick={() => { onClose(); setUiState({ showInsuranceReport: true }); }}
+              className="w-full py-2.5 rounded-xl font-semibold text-[13px] flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98]"
+              style={{
+                background: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(59,130,246,0.12))',
+                border: '1px solid rgba(52,211,153,0.25)',
+                color: '#34d399',
+              }}
+            >
+              <span>🛡️</span>
+              Generate Safe Driver Report
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   );

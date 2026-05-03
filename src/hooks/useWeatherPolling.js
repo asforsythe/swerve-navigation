@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef } from 'react';
-import useSwerveStore from '../store/useSwerveStore';
+import { useCallback, useEffect, useRef } from "react";
+import useSwerveStore from "../store/useSwerveStore";
 
 const DEFAULT_COORDS = [-81.3792, 28.5383]; // Orlando
+const POLL_INTERVAL_MS = 300000; // 5 minutes
 
 /**
  * Enhanced weather polling hook that fetches rich data from Open-Meteo
  * and simulates XWeather lightning/severe data for UI display.
- * 
+ *
  * Open-Meteo provides:
  * - Current: temp, humidity, apparent_temp, precip, weather_code, wind_speed, wind_direction,
  *            wind_gusts, pressure, cloud_cover, visibility, uv_index, dewpoint, soil_temp
@@ -17,28 +18,34 @@ const DEFAULT_COORDS = [-81.3792, 28.5383]; // Orlando
 export function useWeatherPolling({ mapLoaded, userLocationRef }) {
     const { setWeather } = useSwerveStore();
     const intervalRef = useRef(null);
+    const lastFetchRef = useRef(0);
 
     /**
      * Fetch current weather and 24h hourly forecast
      */
     const refreshTelemetry = useCallback(async () => {
+        // Rate limit: don't fetch more than once per 30s
+        if (Date.now() - lastFetchRef.current < 30000) return;
+        lastFetchRef.current = Date.now();
+
         const coords = userLocationRef?.current || DEFAULT_COORDS;
         try {
             // Rich Open-Meteo current + hourly forecast
-            const url = `https://api.open-meteo.com/v1/forecast?` +
+            const url =
+                `https://api.open-meteo.com/v1/forecast?` +
                 `latitude=${coords[1]}&longitude=${coords[0]}` +
                 `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,` +
                 `weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,` +
                 `surface_pressure,cloud_cover,visibility,uv_index,dew_point_2m,is_day` +
                 `&hourly=temperature_2m,precipitation_probability,weather_code,` +
-                `wind_speed_10m,wind_direction_10m,uv_index,is_day` +
+                `wind_speed_10m,wind_direction_10m,uv_index,is_day,surface_pressure` +
                 `&daily=weather_code,temperature_2m_max,temperature_2m_min,` +
                 `sunrise,sunset,precipitation_sum,precipitation_hours,` +
                 `wind_speed_10m_max,wind_direction_10m_dominant` +
                 `&timezone=auto` +
                 `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch`;
 
-            const res = await fetch(url);
+            const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
             if (!res.ok) throw new Error(`Open-Meteo error: ${res.status}`);
             const data = await res.json();
 
@@ -49,19 +56,24 @@ export function useWeatherPolling({ mapLoaded, userLocationRef }) {
 
             // Build hourly forecast array (next 24 hours)
             const hourlyForecast = [];
+            const now = new Date();
             for (let i = 0; i < 24; i++) {
                 if (hourly.time && hourly.time[i]) {
                     const hourDate = new Date(hourly.time[i]);
-                    hourlyForecast.push({
-                        time: hourDate.getHours(),
-                        temp: hourly.temperature_2m?.[i],
-                        precipProb: hourly.precipitation_probability?.[i] || 0,
-                        weatherCode: hourly.weather_code?.[i] || 0,
-                        windSpeed: hourly.wind_speed_10m?.[i] || 0,
-                        windDirection: hourly.wind_direction_10m?.[i] || 0,
-                        uvIndex: hourly.uv_index?.[i] || 0,
-                        isDay: hourly.is_day?.[i] ?? 1,
-                    });
+                    // Only include future hours
+                    if (hourDate >= now || i === 0) {
+                        hourlyForecast.push({
+                            time: hourDate.getHours(),
+                            temp: hourly.temperature_2m?.[i],
+                            precipProb: hourly.precipitation_probability?.[i] || 0,
+                            weatherCode: hourly.weather_code?.[i] || 0,
+                            windSpeed: hourly.wind_speed_10m?.[i] || 0,
+                            windDirection: hourly.wind_direction_10m?.[i] || 0,
+                            uvIndex: hourly.uv_index?.[i] || 0,
+                            isDay: hourly.is_day?.[i] ?? 1,
+                            pressure: hourly.surface_pressure?.[i],
+                        });
+                    }
                 }
             }
 
@@ -82,16 +94,20 @@ export function useWeatherPolling({ mapLoaded, userLocationRef }) {
                 });
             }
 
-            // Calculate pressure trend (last 3 hours vs current)
-            const pressureTrend = hourly.surface_pressure
-                ? (current.surface_pressure || 0) - (hourly.surface_pressure?.[3] || current.surface_pressure || 0)
-                : 0;
+            // Calculate pressure trend (current vs 3 hours ago from hourly)
+            let pressureTrend = 0;
+            if (hourly.surface_pressure && hourly.surface_pressure.length > 3) {
+                const currentPressure = current.surface_pressure || hourly.surface_pressure[0];
+                const pastPressure = hourly.surface_pressure[3]; // ~3 hours ago
+                pressureTrend = (currentPressure || 0) - (pastPressure || currentPressure || 0);
+            }
 
             // Simulate XWeather lightning data for UI (would come from real XWeather API with key)
+            const weatherCode = current.weather_code || 0;
             const simulatedXWeather = {
-                lightningStrikesNearby: current.weather_code >= 95 ? Math.floor(Math.random() * 12) + 3 : 0,
-                lightningDistance: current.weather_code >= 95 ? Math.floor(Math.random() * 15) + 5 : null,
-                severeRiskLevel: current.weather_code >= 95 ? 'high' : current.weather_code >= 61 ? 'moderate' : 'low',
+                lightningStrikesNearby: weatherCode >= 95 ? Math.floor(Math.random() * 12) + 3 : 0,
+                lightningDistance: weatherCode >= 95 ? Math.floor(Math.random() * 15) + 5 : null,
+                severeRiskLevel: weatherCode >= 95 ? "high" : weatherCode >= 61 ? "moderate" : "low",
                 stormBearing: current.wind_direction_10m || 0,
                 xweatherTimestamp: Date.now(),
             };
@@ -122,7 +138,7 @@ export function useWeatherPolling({ mapLoaded, userLocationRef }) {
                 lastUpdated: Date.now(),
             });
         } catch (e) {
-            console.error('[Swerve Weather] Refresh error:', e);
+            console.error("[Swerve Weather] Refresh error:", e);
         }
     }, [setWeather, userLocationRef]);
 
@@ -132,7 +148,7 @@ export function useWeatherPolling({ mapLoaded, userLocationRef }) {
         refreshTelemetry();
 
         // Current conditions: every 5 minutes
-        intervalRef.current = setInterval(refreshTelemetry, 300000);
+        intervalRef.current = setInterval(refreshTelemetry, POLL_INTERVAL_MS);
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);

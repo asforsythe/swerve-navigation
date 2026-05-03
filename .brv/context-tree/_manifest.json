@@ -3,7 +3,7 @@
     {
       "importance": 100,
       "path": "project-handoff/context.md",
-      "tokens": 3600,
+      "tokens": 6800,
       "type": "context"
     },
     {
@@ -61,13 +61,13 @@
       "type": "context"
     }
   ],
-  "generated_at": "2026-04-24T00:00:00Z",
+  "generated_at": "2026-04-25T00:00:00Z",
   "lane_tokens": {
-    "contexts": 7221,
+    "contexts": 13371,
     "stubs": 0,
     "summaries": 0
   },
-  "source_fingerprint": "phase5-adventure-route-partial-2026-04-24",
-  "total_tokens": 9421,
+  "source_fingerprint": "phase5-brainstorm-batch-complete-2026-04-25",
+  "total_tokens": 13371,
   "version": 2
 }
