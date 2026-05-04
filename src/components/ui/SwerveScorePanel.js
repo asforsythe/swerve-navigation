@@ -159,27 +159,46 @@ export default function SwerveScorePanel() {
   return (
     <AnimatePresence>
       {show && (
+        <>
+        <motion.div
+          key="ssp-backdrop"
+          className="sm:hidden fixed inset-0 z-[54] bg-black/55 backdrop-blur-[2px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={() => setUiState({ showSwerveScore: false })}
+        />
         <motion.div
           variants={panelVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
-          className="absolute bottom-6 left-4 z-50 w-72"
+          className="fixed sm:absolute z-[55] sm:z-50 left-0 right-0 bottom-0 sm:left-4 sm:right-auto sm:bottom-6 w-full sm:w-72 rounded-t-[28px] sm:rounded-[20px] overflow-hidden"
           style={{
-            background: 'rgba(10,10,14,0.88)',
+            background: 'rgba(10,10,14,0.92)',
             backdropFilter: 'blur(28px)',
             border: `1px solid ${lv.color}22`,
-            borderRadius: 20,
-            boxShadow: `0 24px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)`,
+            boxShadow: `0 -10px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)`,
           }}
         >
+          {/* Mobile drag handle + status hairline (level-driven) */}
+          <div className="sm:hidden">
+            <div
+              className="absolute inset-x-0 top-0 h-[1.5px]"
+              style={{ background: `linear-gradient(90deg, transparent, ${lv.color}, transparent)` }}
+            />
+            <div className="flex justify-center pt-3 pb-0.5">
+              <div className="w-11 h-1 rounded-full" style={{ background: `${lv.color}90`, boxShadow: `0 0 6px ${lv.color}80` }} />
+            </div>
+          </div>
           {/* Accent top edge */}
           <div
-            className="absolute top-0 left-6 right-6 h-px rounded-full"
+            className="hidden sm:block absolute top-0 left-6 right-6 h-px rounded-full"
             style={{ background: `linear-gradient(90deg, transparent, ${lv.color}60, transparent)` }}
           />
 
-          <div className="p-5">
+          <div className="p-5 max-h-[82vh] overflow-y-auto no-scrollbar sm:max-h-none sm:overflow-visible" style={{ paddingBottom: 'max(1.25rem, calc(var(--safe-bottom, 0px) + 1rem))' }}>
             {/* ── Header ───────────────────────────────────────────────── */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -301,6 +320,7 @@ export default function SwerveScorePanel() {
             )}
           </div>
         </motion.div>
+        </>
       )}
     </AnimatePresence>
   );

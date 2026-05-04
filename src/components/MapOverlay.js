@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import useSwerveStore from '../store/useSwerveStore';
@@ -680,30 +681,54 @@ const MapOverlay = () => {
 
           <WeatherDetailPanel />
 
-          {/* Storm cell intercept banner */}
+          {/* Storm cell intercept banner — alarming, mobile-aware */}
           {stormCells.some((c) => c.interceptsRoute) && (
-            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate-slide-in-top">
-              <div
-                className="rounded-xl border border-red-500/30 backdrop-blur-2xl px-5 py-2.5 flex items-center gap-2.5"
+            <motion.div
+              className="absolute z-50 left-1/2 -translate-x-1/2 sm:top-16 max-w-[calc(100vw-24px)] sm:max-w-none"
+              style={{ top: 'calc(var(--safe-top, 0px) + 96px)' }}
+              initial={{ y: -30, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            >
+              {/* Outer pulse aura */}
+              <motion.div
+                aria-hidden
+                className="absolute -inset-2 rounded-2xl pointer-events-none"
                 style={{
-                  background: 'rgba(20,4,6,0.85)',
-                  boxShadow: '0 8px 32px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
+                  background: 'radial-gradient(ellipse at center, rgba(239,68,68,0.55), transparent 70%)',
+                  filter: 'blur(10px)',
+                }}
+                animate={{ opacity: [0.45, 0.85, 0.45] }}
+                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <div
+                className="relative rounded-2xl px-4 py-2.5 flex items-center gap-3"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(31,5,8,0.95), rgba(15,3,4,0.96))',
+                  border: '1px solid rgba(239,68,68,0.45)',
+                  backdropFilter: 'blur(20px)',
+                  boxShadow: '0 12px 36px rgba(220,38,38,0.40), inset 0 1px 0 rgba(255,255,255,0.07)',
                 }}
               >
-                <span className="text-lg">⚠</span>
-                <div>
-                  <div className="text-red-300 text-[11px] font-semibold tracking-wide uppercase">
-                    Storm Intercept Warning
+                <div className="absolute inset-x-0 top-0 h-[1.5px] rounded-t-2xl" style={{ background: 'linear-gradient(90deg, transparent, rgba(239,68,68,0.95), transparent)' }} />
+                <motion.span
+                  className="text-xl leading-none"
+                  animate={{ scale: [1, 1.18, 1], rotate: [-3, 3, -3] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                >⚠</motion.span>
+                <div className="min-w-0">
+                  <div className="text-rose-200 text-[11px] font-bold tracking-[0.18em] uppercase">
+                    Storm Intercept
                   </div>
-                  <div className="text-white/70 text-[10px]">
+                  <div className="text-white/75 text-[11px] mt-0.5 truncate">
                     {stormCells
                       .filter((c) => c.interceptsRoute)
-                      .map((c) => `Storm intercept in ${Math.round(c.etaMinutes ?? 0)} min`)
-                      .join(' • ')}
+                      .map((c) => `${Math.round(c.etaMinutes ?? 0)} min away`)
+                      .join(' · ')}
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
 
           <TelemetryPanel />
@@ -756,33 +781,51 @@ const MapOverlay = () => {
         </>
       )}
 
-      {/* Phase 5 — True North / Recenter button */}
+      {/* Phase 5 — True North / Recenter — hero compass with rotating ambient ring */}
       {mapLoaded && !showStartButton && (
-        <button
-          onClick={() => {
-            if (!mapRef.current) return;
-            const center = userLocationRef.current || mapRef.current.getCenter().toArray();
-            mapRef.current.flyTo({ center, bearing: 0, pitch: 60, zoom: 15.5, duration: 1500, essential: true });
-          }}
-          className="absolute z-30 w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150 active:scale-90 hover:brightness-125"
+        <div
+          className="absolute z-30"
           style={{
             bottom: 'calc(var(--safe-bottom, 0px) + 12px)',
             left: 'calc(var(--safe-left, 0px) + 12px)',
-            background: 'rgba(10,10,14,0.88)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            backdropFilter: 'blur(16px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.45)',
+            width: 44,
+            height: 44,
           }}
-          title="True North — recenter map"
-          aria-label="Recenter map facing north"
         >
-          {/* Compass needle: red = North, white = South */}
-          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-            <path d="M12 3 L14 10 L12 11.5 L10 10 Z" fill="#ef4444" />
-            <path d="M12 21 L10 14 L12 12.5 L14 14 Z" fill="rgba(255,255,255,0.35)" />
-            <circle cx="12" cy="12" r="1.8" fill="rgba(255,255,255,0.55)" />
-          </svg>
-        </button>
+          {/* Slow rotating conic aura */}
+          <motion.div
+            aria-hidden
+            className="absolute inset-[-3px] rounded-full pointer-events-none opacity-70"
+            style={{
+              background: 'conic-gradient(from 0deg, rgba(244,63,94,0) 0deg, rgba(244,63,94,0.55) 80deg, rgba(244,63,94,0) 160deg, rgba(34,211,238,0) 240deg, rgba(34,211,238,0.5) 320deg, rgba(34,211,238,0) 360deg)',
+              filter: 'blur(5px)',
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+          />
+          <button
+            onClick={() => {
+              if (!mapRef.current) return;
+              const center = userLocationRef.current || mapRef.current.getCenter().toArray();
+              mapRef.current.flyTo({ center, bearing: 0, pitch: 60, zoom: 15.5, duration: 1500, essential: true });
+            }}
+            className="relative w-full h-full rounded-full flex items-center justify-center transition-transform duration-150 active:scale-90"
+            style={{
+              background: 'linear-gradient(180deg, rgba(15,15,22,0.96), rgba(8,8,12,0.96))',
+              border: '1px solid rgba(255,255,255,0.14)',
+              backdropFilter: 'blur(18px)',
+              boxShadow: '0 6px 22px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07)',
+            }}
+            title="True North — recenter map"
+            aria-label="Recenter map facing north"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" style={{ filter: 'drop-shadow(0 0 4px rgba(244,63,94,0.6))' }}>
+              <path d="M12 3 L14 10 L12 11.5 L10 10 Z" fill="#ef4444" />
+              <path d="M12 21 L10 14 L12 12.5 L14 14 Z" fill="rgba(255,255,255,0.45)" />
+              <circle cx="12" cy="12" r="1.8" fill="rgba(255,255,255,0.7)" />
+            </svg>
+          </button>
+        </div>
       )}
 
       {/* Phase 5 — Challenges panel */}

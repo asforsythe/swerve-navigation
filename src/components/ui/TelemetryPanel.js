@@ -341,7 +341,7 @@ const TelemetryPanel = memo(() => {
     const adventureScore = routeTelemetry?.adventureScore ?? null;
     const adventureCategory = routeTelemetry?.adventureCategory ?? null;
 
-    const { color: ssiRingColor, glow: ringGlowRaw } = ssiTheme(ssi);
+    const { color: ssiRingColor, glow: ringGlowRaw, label: ssiLabel } = ssiTheme(ssi);
     const ringColor = isAdventureMode ? '#f97316' : ssiRingColor;
     const ringGlow = isAdventureMode ? 'rgba(249,115,22,0.6)' : ringGlowRaw;
     const edgeColor = ringColor + '70';
@@ -349,6 +349,16 @@ const TelemetryPanel = memo(() => {
     const offset = circumference - (circumference * ssi) / 100;
 
     const sparkColor = ringColor;
+
+    // ── Status word (the expressive label that anchors the pill) ─────────────
+    // "All Clear" / "Cruising" / "Caution" / "Heads Up" / "Danger" / "🔥 Adventure"
+    const statusWord = isAdventureMode
+        ? '🔥 ADVENTURE'
+        : ssi >= 85 ? 'ALL CLEAR'
+        : ssi >= 70 ? 'CRUISING'
+        : ssi >= 55 ? 'CAUTION'
+        : ssi >= 30 ? 'HEADS UP'
+        : 'DANGER';
 
     // Mobile: pill at the top, expands into a top-slide sheet on tap.
     // Desktop (sm+): the original glass panel docked top-left, always rendered.
@@ -360,33 +370,30 @@ const TelemetryPanel = memo(() => {
         const showExpanded = forceExpanded || isExpanded;
         return (
             <div className="p-5">
-                {/* Header */}
+                {/* Header — single status anchor, no competing badges */}
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: theme.color, boxShadow: `0 0 6px ${theme.color}` }} />
-                        <h3 className="text-white/90 font-medium text-xs tracking-[0.2em] uppercase">Telemetry</h3>
+                        <motion.div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: ringColor, boxShadow: `0 0 8px ${ringColor}` }}
+                            animate={{ opacity: [1, 0.45, 1] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                        <h3 className="text-white/90 font-semibold text-[11px] tracking-[0.22em] uppercase">Telemetry</h3>
                     </div>
                     <div className="flex gap-2 items-center">
                         {fastestSsi < ssi && (
-                            <div className="bg-blue-500/20 text-blue-400 text-[9px] font-bold uppercase px-2 py-1 rounded border border-blue-500/20 animate-pulse">
+                            <div className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md animate-pulse"
+                                style={{ background: 'rgba(96,165,250,0.10)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.22)' }}>
                                 Bypass Suggested
                             </div>
                         )}
-                        {isAdventureMode ? (
-                            <div className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/20"
-                                style={{ boxShadow: '0 0 8px rgba(249,115,22,0.25)' }}>
-                                🔥 Adventure
-                            </div>
-                        ) : (
-                            <div
-                                className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${ssi < 70
-                                    ? 'bg-red-500/20 text-red-400 border border-red-500/20 shadow-neon-red'
-                                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-neon-green'
-                                    }`}
-                            >
-                                {ssi < 70 ? 'Caution' : 'Optimal'}
-                            </div>
-                        )}
+                        <span
+                            className="text-[10px] font-bold uppercase tracking-[0.18em]"
+                            style={{ color: ringColor, textShadow: `0 0 10px ${ringGlow}` }}
+                        >
+                            {statusWord}
+                        </span>
                         <svg
                             className={`w-3 h-3 text-white/30 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
                             fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -418,22 +425,24 @@ const TelemetryPanel = memo(() => {
                     </div>
                 </div>
 
-                {/* Safety Ring */}
-                <div className="flex items-center justify-center mb-5">
-                    <div className="relative w-32 h-32 flex items-center justify-center">
-                        {/* Animated background glow */}
-                        <div
-                            className="absolute inset-0 rounded-full opacity-20 animate-pulse"
-                            style={{ background: `radial-gradient(circle, ${ringGlow} 0%, transparent 70%)` }}
+                {/* Safety Ring — hero anchor */}
+                <div className="flex flex-col items-center justify-center mb-5">
+                    <div className="relative w-40 h-40 flex items-center justify-center">
+                        {/* Outer breathing aura */}
+                        <motion.div
+                            className="absolute inset-[-10px] rounded-full pointer-events-none"
+                            style={{ background: `radial-gradient(circle, ${ringGlow} 0%, transparent 65%)`, filter: 'blur(6px)' }}
+                            animate={{ opacity: [0.45, 0.85, 0.45], scale: [0.95, 1.04, 0.95] }}
+                            transition={{ duration: 4.6, repeat: Infinity, ease: 'easeInOut' }}
                         />
                         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                             <defs>
                                 <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stopColor={ringColor} stopOpacity="0.3" />
+                                    <stop offset="0%" stopColor={ringColor} stopOpacity="0.35" />
                                     <stop offset="100%" stopColor={ringColor} />
                                 </linearGradient>
                             </defs>
-                            <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.05)" strokeWidth="6" fill="transparent" />
+                            <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.06)" strokeWidth="6" fill="transparent" />
                             <circle
                                 cx="50" cy="50" r="40"
                                 stroke="url(#ringGradient)"
@@ -443,14 +452,26 @@ const TelemetryPanel = memo(() => {
                                 strokeDashoffset={offset}
                                 strokeLinecap="round"
                                 className="transition-all duration-1000 ease-out"
-                                style={{ filter: `drop-shadow(0 0 10px ${ringGlow})` }}
+                                style={{ filter: `drop-shadow(0 0 12px ${ringGlow})` }}
                             />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-3xl font-mono font-bold text-white tracking-tighter tabular-nums">
+                            <span
+                                className="font-bold text-white tabular-nums leading-none"
+                                style={{
+                                    fontSize: 52,
+                                    letterSpacing: '-0.05em',
+                                    textShadow: `0 0 18px ${ringGlow}`,
+                                }}
+                            >
                                 <RollingNumber value={ssi} />
                             </span>
-                            <span className="text-[9px] uppercase tracking-widest text-white/40 -mt-0.5">Safety Index</span>
+                            <span
+                                className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.22em]"
+                                style={{ color: ringColor, textShadow: `0 0 8px ${ringGlow}` }}
+                            >
+                                {statusWord}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -479,51 +500,80 @@ const TelemetryPanel = memo(() => {
                     </div>
                 </div>
 
-                {/* Original Path Risk */}
+                {/* Original Path Risk — minimal, status-toned */}
                 {fastestSsi < 80 && fastestSsi !== ssi && (
-                    <div className="mb-4 bg-red-500/10 rounded-xl p-3 border border-red-500/20 flex items-center justify-between animate-fade-in">
-                        <div className="text-[10px] text-red-400 font-bold uppercase tracking-tight">Original Path Risk</div>
-                        <div className="text-red-400 font-mono text-sm font-bold tabular-nums">{Math.round(fastestSsi)}%</div>
+                    <div className="mb-4 flex items-center justify-between py-2 border-y border-rose-500/15 animate-fade-in">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1 h-4 rounded-full" style={{ background: '#f43f5e', boxShadow: '0 0 6px #f43f5e' }} />
+                            <div className="text-rose-300/90 text-[10px] font-bold uppercase tracking-[0.18em]">Original Path Risk</div>
+                        </div>
+                        <div className="text-rose-300 font-bold text-base tabular-nums" style={{ letterSpacing: '-0.03em' }}>
+                            {Math.round(fastestSsi)}<span className="text-rose-400/60 text-xs">%</span>
+                        </div>
                     </div>
                 )}
 
-                {/* Primary Stats Grid */}
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                        <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Road Temp</div>
-                        <div className="text-white font-mono text-lg tabular-nums">
-                            {Math.round(roadTemp)}<span className="text-white/40 text-sm">°F</span>
+                {/* ─── Conditions section: typography rhythm + dividers ─── */}
+                <div className="mb-4">
+                    <div className="text-[9px] uppercase tracking-[0.22em] text-white/30 mb-3">Conditions</div>
+                    {/* Hero stat row: Road Temp | Traction — confident numerals, no borders */}
+                    <div className="grid grid-cols-2 gap-4 pb-3 border-b border-white/[0.06]">
+                        <div>
+                            <div className="text-white/35 text-[10px] uppercase tracking-wider">Road Temp</div>
+                            <div className="mt-0.5 flex items-baseline gap-1">
+                                <span className="text-white font-bold tabular-nums" style={{ fontSize: 26, letterSpacing: '-0.03em' }}>
+                                    {Math.round(roadTemp)}
+                                </span>
+                                <span className="text-white/40 text-sm">°F</span>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-white/35 text-[10px] uppercase tracking-wider">Traction</div>
+                            <div className="mt-0.5 flex items-baseline justify-end gap-1">
+                                <span
+                                    className="font-bold tabular-nums"
+                                    style={{
+                                        fontSize: 26,
+                                        letterSpacing: '-0.03em',
+                                        color: traction >= 80 ? '#34d399' : traction >= 60 ? '#fbbf24' : '#f43f5e',
+                                    }}
+                                >
+                                    {traction}
+                                </span>
+                                <span className="text-white/40 text-sm">%</span>
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.02] hover:bg-white/[0.05] transition-colors">
-                        <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Traction</div>
-                        <div className="text-white font-mono text-lg tabular-nums">{traction}%</div>
-                    </div>
-                </div>
 
-                {/* Precip + Wind Row */}
-                <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.02] mb-3">
-                    <div className="flex justify-between items-center">
+                    {/* Precip + Wind row — wind compass is its own visual hero */}
+                    <div className="flex items-center justify-between py-3 border-b border-white/[0.06]">
                         <div>
-                            <div className="text-white/40 text-[10px] uppercase tracking-wider mb-1">Precip (past hr)</div>
-                            <div className="text-white font-mono text-base tabular-nums">
-                                {precipIntensity >= 0.01
-                                    ? <>{precipIntensity.toFixed(2)} <span className="text-white/40 text-xs">in</span></>
-                                    : precipIntensity > 0
-                                        ? <span className="text-white/60 text-sm">Trace</span>
-                                        : <span className="text-white/40">None</span>}
+                            <div className="text-white/35 text-[10px] uppercase tracking-wider">Precip · past hr</div>
+                            <div className="mt-0.5 flex items-baseline gap-1">
+                                {precipIntensity >= 0.01 ? (
+                                    <>
+                                        <span className="text-white font-bold tabular-nums" style={{ fontSize: 22, letterSpacing: '-0.03em' }}>
+                                            {precipIntensity.toFixed(2)}
+                                        </span>
+                                        <span className="text-white/40 text-xs">in</span>
+                                    </>
+                                ) : precipIntensity > 0 ? (
+                                    <span className="text-white/65 text-base">Trace</span>
+                                ) : (
+                                    <span className="text-white/35 text-base">None</span>
+                                )}
                             </div>
                         </div>
                         <WindCompass direction={windDirection} speed={windSpeed} gusts={windGusts} />
                     </div>
-                </div>
 
-                {/* Visibility + UV Row */}
-                <div className="bg-white/[0.03] rounded-xl p-3 border border-white/[0.02] mb-3 space-y-2">
-                    <VisibilityBar visibility={visibility} />
-                    <div className="flex items-center justify-between pt-1">
-                        <UVBadge uv={uvIndex} />
-                        <PressureGauge pressure={pressure} trend={pressureTrend} />
+                    {/* Visibility + UV + Pressure rows */}
+                    <div className="pt-3 space-y-3">
+                        <VisibilityBar visibility={visibility} />
+                        <div className="flex items-center justify-between pt-0.5">
+                            <UVBadge uv={uvIndex} />
+                            <PressureGauge pressure={pressure} trend={pressureTrend} />
+                        </div>
                     </div>
                 </div>
 
@@ -587,22 +637,6 @@ const TelemetryPanel = memo(() => {
         );
     };
 
-    const statusBadge = isAdventureMode ? (
-        <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/20">
-            🔥 Adventure
-        </span>
-    ) : (
-        <span
-            className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                ssi < 70
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/20'
-                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20'
-            }`}
-        >
-            {ssi < 70 ? 'Caution' : 'Optimal'}
-        </span>
-    );
-
     return (
         <>
             {/* ── DESKTOP: original glass panel docked top-left ─────────────────── */}
@@ -631,67 +665,131 @@ const TelemetryPanel = memo(() => {
                 />
             </motion.div>
 
-            {/* ── MOBILE: compact pill at the top ───────────────────────────────── */}
+            {/* ── MOBILE: hero pill — Flighty-grade single-color discipline ─────── */}
             <motion.button
                 type="button"
                 onClick={() => setMobileSheetOpen(true)}
-                className="sm:hidden absolute z-40 left-3 right-3 rounded-2xl glass-panel overflow-hidden text-left active:scale-[0.98] transition-transform"
+                className="sm:hidden absolute z-40 left-3 right-3 rounded-[22px] overflow-hidden text-left active:scale-[0.985] transition-transform"
                 style={{
                     top: 'calc(var(--safe-top, 0px) + 10px)',
-                    boxShadow: `0 0 0 1px ${edgeColor}, 0 6px 22px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                    background: 'linear-gradient(180deg, rgba(15,15,22,0.94) 0%, rgba(8,8,12,0.96) 100%)',
+                    backdropFilter: 'blur(28px)',
+                    WebkitBackdropFilter: 'blur(28px)',
+                    boxShadow: `
+                        0 0 0 1px ${ringColor}33,
+                        0 0 28px ${ringGlow},
+                        0 14px 36px rgba(0,0,0,0.5),
+                        inset 0 1px 0 rgba(255,255,255,0.06)
+                    `,
                 }}
                 variants={slideRight}
                 initial="hidden"
                 animate="visible"
                 aria-label="Open Telemetry"
             >
-                <div
-                    className="absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
-                    style={{ background: `linear-gradient(90deg, transparent, ${edgeColor}, transparent)` }}
+                {/* Aurora — slow-breathing radial behind the SSI hero, tinted by status */}
+                <motion.div
+                    className="absolute pointer-events-none"
+                    style={{
+                        right: -40,
+                        top: -30,
+                        width: 200,
+                        height: 200,
+                        background: `radial-gradient(circle, ${ringColor}38 0%, ${ringColor}10 35%, transparent 70%)`,
+                        filter: 'blur(8px)',
+                    }}
+                    animate={{ opacity: [0.65, 1, 0.65], scale: [1, 1.08, 1] }}
+                    transition={{ duration: 5.4, repeat: Infinity, ease: 'easeInOut' }}
                 />
-                <div className="flex items-center gap-3 px-3.5 py-2.5">
-                    {/* Mini SSI ring */}
-                    <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
-                        <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.06)" strokeWidth="10" fill="transparent" />
-                            <circle
-                                cx="50"
-                                cy="50"
-                                r="40"
-                                stroke={ringColor}
-                                strokeWidth="10"
-                                fill="transparent"
-                                strokeDasharray={circumference}
-                                strokeDashoffset={offset}
-                                strokeLinecap="round"
-                                style={{ filter: `drop-shadow(0 0 6px ${ringGlow})`, transition: 'stroke-dashoffset 1s ease-out' }}
-                            />
-                        </svg>
-                        <span className="absolute font-mono font-bold text-[11px] text-white tabular-nums">
-                            {Math.round(ssi)}
-                        </span>
+                {/* Subtle counter-aurora on the left */}
+                <motion.div
+                    className="absolute pointer-events-none"
+                    style={{
+                        left: -50,
+                        bottom: -40,
+                        width: 180,
+                        height: 180,
+                        background: `radial-gradient(circle, ${theme.glow} 0%, transparent 60%)`,
+                        filter: 'blur(10px)',
+                        opacity: 0.5,
+                    }}
+                    animate={{ opacity: [0.35, 0.55, 0.35] }}
+                    transition={{ duration: 6.8, repeat: Infinity, ease: 'easeInOut' }}
+                />
+
+                {/* Animated status hairline at top */}
+                <div
+                    className="absolute inset-x-0 top-0 h-[1.5px] overflow-hidden"
+                    style={{ background: `linear-gradient(90deg, transparent, ${ringColor}, transparent)` }}
+                >
+                    <motion.div
+                        className="absolute top-0 bottom-0 w-1/3"
+                        style={{ background: `linear-gradient(90deg, transparent, white, transparent)`, mixBlendMode: 'overlay' }}
+                        animate={{ x: ['-150%', '350%'] }}
+                        transition={{ duration: 4.2, repeat: Infinity, ease: 'linear' }}
+                    />
+                </div>
+
+                <div className="relative flex items-center gap-3 px-4 py-3">
+                    {/* ─ Weather icon (compact hero) ─ */}
+                    <div
+                        className="w-11 h-11 shrink-0"
+                        style={{ filter: `drop-shadow(0 0 10px ${theme.glow})` }}
+                    >
+                        <WeatherIcon code={weatherCode} className="w-full h-full" />
                     </div>
 
-                    {/* Temp + condition (the Flighty hero — large weighted type) */}
+                    {/* ─ Temp + condition stacked ─ */}
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 leading-none">
-                            <span className="text-[26px] font-mono font-bold text-white tabular-nums tracking-tight">
+                        <div className="flex items-baseline gap-2 leading-none">
+                            <span
+                                className="font-bold text-white tabular-nums"
+                                style={{
+                                    fontSize: 32,
+                                    letterSpacing: '-0.04em',
+                                    fontFeatureSettings: '"tnum" 1',
+                                    textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                                }}
+                            >
                                 {Math.round(current.temp ?? roadTemp)}°
                             </span>
-                            <span className="truncate text-[12px] font-medium" style={{ color: theme.color }}>
-                                {theme.description}
-                            </span>
                         </div>
-                        <div className="text-white/30 text-[10px] mt-0.5">
+                        <div className="mt-1 truncate text-[12px] font-semibold tracking-tight" style={{ color: theme.color }}>
+                            {theme.description}
+                        </div>
+                        <div className="text-white/35 text-[10px] mt-0.5 truncate">
                             Feels {Math.round(current.feelsLike ?? current.temp ?? roadTemp)}° · {humidity}% RH
                         </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                        {statusBadge}
-                        <svg className="w-3.5 h-3.5 text-white/35" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
+                    {/* ─ SSI hero — confident numeral + status word, single accent ─ */}
+                    <div className="relative shrink-0 flex flex-col items-end pl-2">
+                        <span
+                            className="font-bold tabular-nums leading-none"
+                            style={{
+                                fontSize: 34,
+                                color: ringColor,
+                                letterSpacing: '-0.04em',
+                                fontFeatureSettings: '"tnum" 1',
+                                textShadow: `0 0 14px ${ringGlow}, 0 0 28px ${ringGlow}`,
+                            }}
+                        >
+                            <RollingNumber value={ssi} />
+                        </span>
+                        <div
+                            className="mt-1 text-[8.5px] font-bold uppercase tracking-[0.18em]"
+                            style={{ color: ringColor, opacity: 0.95 }}
+                        >
+                            {statusWord}
+                        </div>
+                        <div
+                            className="mt-0.5 h-[2px] rounded-full"
+                            style={{
+                                width: `${Math.max(18, Math.min(48, (ssi / 100) * 48))}px`,
+                                background: `linear-gradient(90deg, transparent, ${ringColor})`,
+                                boxShadow: `0 0 6px ${ringGlow}`,
+                            }}
+                        />
                     </div>
                 </div>
             </motion.button>

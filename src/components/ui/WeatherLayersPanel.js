@@ -37,15 +37,40 @@ const WeatherLayersPanel = () => {
 
     if (!isOpen) return null;
 
+    const close = () => useSwerveStore.getState().setUiState({ showWeatherLayers: false });
+
     return (
-        <div className="absolute top-16 right-4 z-50 w-72 animate-slide-in-right">
+        <>
             <div
-                className="rounded-2xl border border-white/[0.10] backdrop-blur-2xl overflow-hidden"
+                className="sm:hidden fixed inset-0 z-[54] bg-black/55 backdrop-blur-[2px] animate-fade-in"
+                onClick={close}
+            />
+            <div
+                className="
+                    fixed sm:absolute z-[55] sm:z-50
+                    left-0 right-0 bottom-0 sm:left-auto sm:bottom-auto sm:top-16 sm:right-4
+                    w-full sm:w-72
+                    sm:animate-slide-in-right
+                "
+                style={{ paddingBottom: 'calc(var(--safe-bottom, 0px) + 4px)' }}
+            >
+            <div
+                className="rounded-t-[28px] sm:rounded-2xl border border-white/[0.10] backdrop-blur-2xl overflow-hidden"
                 style={{
-                    background: 'rgba(10,10,14,0.82)',
-                    boxShadow: '0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
+                    background: 'rgba(10,10,14,0.92)',
+                    boxShadow: '0 -12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
                 }}
             >
+                {/* Mobile drag handle + blue hairline */}
+                <div className="sm:hidden">
+                    <div
+                        className="absolute inset-x-0 top-0 h-[1.5px]"
+                        style={{ background: 'linear-gradient(90deg, transparent, rgba(96,165,250,0.85), transparent)' }}
+                    />
+                    <div className="flex justify-center pt-3 pb-1">
+                        <div className="w-11 h-1 rounded-full" style={{ background: 'rgba(96,165,250,0.6)', boxShadow: '0 0 6px rgba(96,165,250,0.55)' }} />
+                    </div>
+                </div>
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 pt-4 pb-2">
                     <div className="flex items-center gap-2">
@@ -156,7 +181,8 @@ const WeatherLayersPanel = () => {
                     )}
                 </div>
             </div>
-        </div>
+            </div>
+        </>
     );
 };
 

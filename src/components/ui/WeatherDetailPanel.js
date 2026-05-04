@@ -232,22 +232,46 @@ const WeatherDetailPanel = memo(() => {
 
     if (!isOpen) return null;
 
+    const close = () => setUiState({ showWeatherDetail: false });
+
     return (
-        <div className="absolute top-6 left-[340px] z-40 w-80 max-h-[calc(100vh-48px)] overflow-y-auto no-scrollbar animate-slide-in-left">
+        <>
             <div
-                className="rounded-[20px] border border-white/[0.08] backdrop-blur-2xl overflow-hidden"
+                className="sm:hidden fixed inset-0 z-[54] bg-black/55 backdrop-blur-[2px] animate-fade-in"
+                onClick={close}
+            />
+            <div className="
+                fixed sm:absolute z-[55] sm:z-40
+                left-0 right-0 bottom-0 sm:left-[340px] sm:right-auto sm:bottom-auto sm:top-6
+                w-full sm:w-80
+                max-h-[85vh] sm:max-h-[calc(100vh-48px)]
+                overflow-y-auto no-scrollbar
+                sm:animate-slide-in-left
+            ">
+            <div
+                className="rounded-t-[28px] sm:rounded-[20px] border border-white/[0.08] backdrop-blur-2xl overflow-hidden"
                 style={{
-                    background: 'rgba(10,10,14,0.85)',
-                    boxShadow: '0 12px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
+                    background: 'rgba(10,10,14,0.92)',
+                    boxShadow: '0 -10px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)',
                 }}
             >
+                {/* Mobile drag handle + weather-themed hairline */}
+                <div className="sm:hidden sticky top-0 z-10" style={{ background: 'rgba(10,10,14,0.94)' }}>
+                    <div
+                        className="absolute inset-x-0 top-0 h-[1.5px]"
+                        style={{ background: `linear-gradient(90deg, transparent, ${theme.color}, transparent)` }}
+                    />
+                    <div className="flex justify-center pt-3 pb-0.5">
+                        <div className="w-11 h-1 rounded-full" style={{ background: `${theme.color}90`, boxShadow: `0 0 6px ${theme.color}80` }} />
+                    </div>
+                </div>
                 {/* Top edge glow matching weather theme */}
                 <div
-                    className="absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
+                    className="hidden sm:block absolute inset-x-0 top-0 h-[1px] animate-edge-pulse"
                     style={{ background: `linear-gradient(90deg, transparent, ${theme.color}60, transparent)` }}
                 />
 
-                <div className="p-5">
+                <div className="p-5" style={{ paddingBottom: 'max(1.25rem, calc(var(--safe-bottom, 0px) + 1rem))' }}>
                     {/* Header */}
                     <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-2">
@@ -348,11 +372,12 @@ const WeatherDetailPanel = memo(() => {
 
                 {/* Bottom edge glow */}
                 <div
-                    className="absolute inset-x-0 bottom-0 h-[1px]"
+                    className="hidden sm:block absolute inset-x-0 bottom-0 h-[1px]"
                     style={{ background: `linear-gradient(90deg, transparent, ${theme.color}40, transparent)` }}
                 />
             </div>
-        </div>
+            </div>
+        </>
     );
 });
 

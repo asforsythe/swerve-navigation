@@ -85,45 +85,67 @@ const Toast = React.forwardRef(({ toast, onRemove }, ref) => {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="pointer-events-auto relative overflow-hidden"
+            className="pointer-events-auto relative"
         >
-            {/* Confetti (success) */}
-            {isSuccess && (
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                    {confetti.map((p) => <ConfettiPiece key={p.id} {...p} />)}
-                </div>
-            )}
-
-            {/* Body */}
-            <div
-                className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl backdrop-blur-xl shadow-glass-lg"
-                style={{ background: 'rgba(10,10,14,0.92)', border: `1px solid ${borderColor}` }}
-            >
-                {ICONS[toast.type] ?? ICONS.info}
-                <span className="text-white/90 text-sm font-medium">{toast.message}</span>
-                <motion.button
-                    onClick={() => onRemove(toast.id)}
-                    className="ml-1 text-white/30 hover:text-white/70 transition-colors"
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.85 }}
-                    aria-label="Dismiss"
-                >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </motion.button>
-            </div>
-
-            {/* Progress drain */}
-            <div
-                className="absolute bottom-0 left-0 h-[2px] rounded-full"
+            {/* Outer status aura */}
+            <motion.div
+                aria-hidden
+                className="absolute -inset-1.5 rounded-2xl pointer-events-none"
                 style={{
-                    backgroundColor: progressColor,
-                    width: '100%',
-                    animation: `progressDrain ${duration}ms linear forwards`,
-                    boxShadow: `0 0 6px ${progressColor}`,
+                    background: `radial-gradient(ellipse at center, ${progressColor}55, transparent 70%)`,
+                    filter: 'blur(10px)',
                 }}
+                animate={{ opacity: [0.5, 0.85, 0.5] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
             />
+            <div className="relative overflow-hidden rounded-2xl">
+                {/* Confetti (success) */}
+                {isSuccess && (
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+                        {confetti.map((p) => <ConfettiPiece key={p.id} {...p} />)}
+                    </div>
+                )}
+
+                {/* Body */}
+                <div
+                    className="relative flex items-center gap-2.5 px-4 py-3 rounded-2xl backdrop-blur-xl"
+                    style={{
+                        background: 'linear-gradient(135deg, rgba(15,15,22,0.96), rgba(8,8,12,0.96))',
+                        border: `1px solid ${borderColor}`,
+                        boxShadow: `0 12px 36px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06)`,
+                    }}
+                >
+                    {/* Status hairline */}
+                    <div
+                        className="absolute inset-x-0 top-0 h-[1.5px] rounded-t-2xl"
+                        style={{ background: `linear-gradient(90deg, transparent, ${progressColor}, transparent)` }}
+                    />
+                    {ICONS[toast.type] ?? ICONS.info}
+                    <span className="text-white/95 text-sm font-medium tracking-tight">{toast.message}</span>
+                    <motion.button
+                        onClick={() => onRemove(toast.id)}
+                        className="ml-1 text-white/35 hover:text-white/80 transition-colors"
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.85 }}
+                        aria-label="Dismiss"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </motion.button>
+                </div>
+
+                {/* Progress drain */}
+                <div
+                    className="absolute bottom-0 left-0 h-[2px] rounded-full"
+                    style={{
+                        backgroundColor: progressColor,
+                        width: '100%',
+                        animation: `progressDrain ${duration}ms linear forwards`,
+                        boxShadow: `0 0 8px ${progressColor}`,
+                    }}
+                />
+            </div>
         </motion.div>
     );
 });
@@ -133,7 +155,10 @@ const ToastContainer = () => {
     const { toasts, removeToast } = useSwerveStore();
 
     return (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2 pointer-events-none min-w-[300px]">
+        <div
+            className="absolute left-1/2 -translate-x-1/2 z-[80] flex flex-col items-center gap-2 pointer-events-none min-w-[300px] max-w-[calc(100vw-24px)]"
+            style={{ top: 'calc(var(--safe-top, 0px) + 100px)' }}
+        >
             <AnimatePresence mode="popLayout">
                 {toasts.map((toast) => (
                     <Toast key={toast.id} toast={toast} onRemove={removeToast} />

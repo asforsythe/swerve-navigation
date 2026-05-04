@@ -201,7 +201,47 @@ const StartScreen = ({ isVoiceReady, onStart }) => {
 
                 <SwerveLogoMark isReady={isVoiceReady} />
 
-                <h2 className="text-white text-xl font-semibold tracking-tight mb-2">
+                {/* Hero wordmark — letter-by-letter reveal, status-tinted aurora behind */}
+                <div className="relative mb-1.5">
+                    <div
+                        aria-hidden
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                            background: 'radial-gradient(ellipse at center, rgba(244,63,94,0.35) 0%, rgba(167,139,250,0.18) 35%, transparent 70%)',
+                            filter: 'blur(14px)',
+                            opacity: isVoiceReady ? 0.95 : 0.6,
+                            transition: 'opacity 0.8s ease',
+                        }}
+                    />
+                    <h1
+                        className="relative font-black text-white tracking-[0.04em]"
+                        style={{
+                            fontSize: 38,
+                            lineHeight: 1,
+                            letterSpacing: '0.08em',
+                            background: 'linear-gradient(180deg, #ffffff 0%, #f1f5f9 55%, #cbd5e1 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            textShadow: '0 0 22px rgba(244,63,94,0.35)',
+                        }}
+                    >
+                        {'SWERVE'.split('').map((ch, i) => (
+                            <span
+                                key={i}
+                                className="inline-block"
+                                style={{
+                                    opacity: 0,
+                                    animation: `wordmarkIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${0.18 + i * 0.07}s forwards`,
+                                }}
+                            >
+                                {ch}
+                            </span>
+                        ))}
+                    </h1>
+                </div>
+
+                <h2 className="text-white/90 text-[15px] font-semibold tracking-tight mb-1.5">
                     {isVoiceReady ? 'Ready to Roll' : 'Initializing'}
                 </h2>
 

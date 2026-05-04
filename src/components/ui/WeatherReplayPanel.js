@@ -124,26 +124,56 @@ export default function WeatherReplayPanel() {
   return (
     <AnimatePresence>
       {show && (
+        <>
+        <motion.div
+          key="wr-backdrop"
+          className="sm:hidden fixed inset-0 z-[54] bg-black/55 backdrop-blur-[2px]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={close}
+        />
         <motion.div
           key="weather-replay"
-          initial={{ x: '100%', opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '100%', opacity: 0 }}
+          initial={{ y: '100%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-          className="absolute top-0 right-0 bottom-0 z-50 flex items-center pr-4"
+          className="
+            fixed sm:absolute z-[55] sm:z-50
+            left-0 right-0 bottom-0 sm:left-auto sm:bottom-0 sm:top-0 sm:right-0
+            sm:flex sm:items-center sm:pr-4
+          "
           style={{ pointerEvents: 'auto' }}
         >
           <div
-            className="w-72 max-h-[88vh] rounded-[20px] border border-white/[0.1] overflow-hidden flex flex-col"
+            className="
+              w-full sm:w-72
+              max-h-[85vh] sm:max-h-[88vh]
+              rounded-t-[28px] sm:rounded-[20px]
+              border border-white/[0.1] overflow-hidden flex flex-col
+            "
             style={{
               background: 'rgba(10,10,14,0.97)',
               backdropFilter: 'blur(24px)',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+              boxShadow: '0 -10px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}
           >
+            {/* Mobile drag handle + violet hairline */}
+            <div className="sm:hidden flex-shrink-0 relative">
+              <div
+                className="absolute inset-x-0 top-0 h-[1.5px]"
+                style={{ background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.85), transparent)' }}
+              />
+              <div className="flex justify-center pt-3 pb-0.5">
+                <div className="w-11 h-1 rounded-full" style={{ background: 'rgba(167,139,250,0.6)', boxShadow: '0 0 6px rgba(167,139,250,0.55)' }} />
+              </div>
+            </div>
             {/* Top bar */}
             <div
-              className="h-[3px] flex-shrink-0"
+              className="h-[3px] flex-shrink-0 hidden sm:block"
               style={{ background: `linear-gradient(90deg, #a78bfa, #a78bfa44, transparent)` }}
             />
 
@@ -348,6 +378,7 @@ export default function WeatherReplayPanel() {
             </div>
           </div>
         </motion.div>
+        </>
       )}
     </AnimatePresence>
   );

@@ -151,28 +151,53 @@ export default function ChallengesPanel() {
     return (
         <AnimatePresence>
             {show && (
+                <>
+                <motion.div
+                    key="ch-backdrop"
+                    className="sm:hidden fixed inset-0 z-[54] bg-black/55 backdrop-blur-[2px]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={() => setUiState({ showChallenges: false })}
+                />
                 <motion.div
                     key="challenges-panel"
-                    initial={{ opacity: 0, x: -32, scale: 0.97 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    exit={{ opacity: 0, x: -32, scale: 0.97 }}
+                    initial={{ opacity: 0, y: 32, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 32, scale: 0.97 }}
                     transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                    className="absolute top-6 left-[340px] z-40 w-80 rounded-[20px] overflow-hidden"
+                    className="
+                        fixed sm:absolute z-[55] sm:z-40
+                        left-0 right-0 bottom-0 sm:left-[340px] sm:right-auto sm:bottom-auto sm:top-6
+                        w-full sm:w-80
+                        rounded-t-[28px] sm:rounded-[20px] overflow-hidden
+                    "
                     style={{
-                        background: 'rgba(10,10,14,0.92)',
+                        background: 'rgba(10,10,14,0.94)',
                         border: '1px solid rgba(255,255,255,0.08)',
-                        boxShadow: '0 16px 48px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
+                        boxShadow: '0 -10px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
                         backdropFilter: 'blur(24px)',
-                        maxHeight: 'calc(100vh - 48px)',
+                        maxHeight: '85vh',
                     }}
                 >
+                    {/* Mobile drag handle + status hairline */}
+                    <div className="sm:hidden">
+                        <div
+                            className="absolute inset-x-0 top-0 h-[1.5px]"
+                            style={{ background: 'linear-gradient(90deg, transparent, rgba(252,211,77,0.85), transparent)' }}
+                        />
+                        <div className="flex justify-center pt-3 pb-0.5">
+                            <div className="w-11 h-1 rounded-full" style={{ background: 'rgba(252,211,77,0.55)', boxShadow: '0 0 6px rgba(252,211,77,0.5)' }} />
+                        </div>
+                    </div>
                     {/* Top accent */}
                     <div
-                        className="absolute inset-x-0 top-0 h-[1px]"
+                        className="hidden sm:block absolute inset-x-0 top-0 h-[1px]"
                         style={{ background: 'linear-gradient(90deg, transparent, rgba(252,211,77,0.6), transparent)' }}
                     />
 
-                    <div className="p-5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 96px)' }}>
+                    <div className="p-5 overflow-y-auto no-scrollbar" style={{ maxHeight: '85vh', paddingBottom: 'max(1.25rem, calc(var(--safe-bottom, 0px) + 1rem))' }}>
                         {/* Header */}
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
@@ -253,6 +278,7 @@ export default function ChallengesPanel() {
                         )}
                     </div>
                 </motion.div>
+                </>
             )}
         </AnimatePresence>
     );

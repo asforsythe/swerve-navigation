@@ -627,6 +627,7 @@ const RouteEnginePanel = ({
                 backdropFilter: 'blur(28px)',
                 WebkitBackdropFilter: 'blur(28px)',
                 boxShadow: `0 -10px 40px rgba(0,0,0,0.55), 0 0 0 1px ${accent.color}33, inset 0 1px 0 rgba(255,255,255,0.06)`,
+                touchAction: 'none',
             }}
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
@@ -822,38 +823,95 @@ const RouteEnginePanel = ({
                         </button>
                     </div>
 
-                    {/* PLAN BUTTON — hero treatment */}
-                    <motion.button
-                        type="button"
-                        onClick={handlePlanClick}
-                        disabled={isRouting}
-                        whileTap={!isRouting ? { scale: 0.985 } : {}}
-                        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                        className="relative w-full overflow-hidden rounded-2xl py-4 text-white font-bold text-[16px] tracking-tight"
-                        style={{
-                            background: isAdventure
-                                ? 'linear-gradient(135deg, rgba(217,119,6,0.96), rgba(249,115,22,0.92))'
-                                : 'linear-gradient(135deg, rgba(225,29,72,0.96), rgba(244,63,94,0.92))',
-                            boxShadow: isAdventure
-                                ? '0 10px 32px rgba(249,115,22,0.45), inset 0 1px 0 rgba(255,255,255,0.20)'
-                                : '0 10px 32px rgba(244,63,94,0.45), inset 0 1px 0 rgba(255,255,255,0.20)',
-                            opacity: isRouting ? 0.55 : 1,
-                            cursor: isRouting ? 'not-allowed' : 'pointer',
-                        }}
-                    >
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/45 to-transparent" />
-                        {ripple && (
-                            <span
-                                className="absolute rounded-full bg-white/35 pointer-events-none animate-ping"
-                                style={{ left: ripple.x - 18, top: ripple.y - 18, width: 36, height: 36 }}
+                    {/* PLAN BUTTON — Flighty-grade hero CTA */}
+                    <div className="relative">
+                        {/* Outer ambient aura — slowly breathes */}
+                        <motion.div
+                            aria-hidden
+                            className="absolute -inset-1 rounded-[22px] pointer-events-none"
+                            style={{
+                                background: isAdventure
+                                    ? 'radial-gradient(ellipse at center, rgba(249,115,22,0.55), transparent 70%)'
+                                    : 'radial-gradient(ellipse at center, rgba(244,63,94,0.55), transparent 70%)',
+                                filter: 'blur(14px)',
+                            }}
+                            animate={{ opacity: isRouting ? [0.3, 0.6, 0.3] : [0.55, 0.85, 0.55] }}
+                            transition={{ duration: isRouting ? 1.4 : 3.2, repeat: Infinity, ease: 'easeInOut' }}
+                        />
+                        {/* Rotating conic border — the wow detail */}
+                        <motion.div
+                            aria-hidden
+                            className="absolute -inset-[1.5px] rounded-[20px] pointer-events-none opacity-90"
+                            style={{
+                                background: isAdventure
+                                    ? 'conic-gradient(from 0deg, rgba(255,205,120,0.0) 0deg, rgba(255,205,120,0.85) 60deg, rgba(249,115,22,0.0) 120deg, rgba(255,170,80,0.0) 240deg, rgba(255,205,120,0.85) 300deg, rgba(249,115,22,0.0) 360deg)'
+                                    : 'conic-gradient(from 0deg, rgba(255,140,170,0.0) 0deg, rgba(255,140,170,0.85) 60deg, rgba(244,63,94,0.0) 120deg, rgba(255,180,200,0.0) 240deg, rgba(255,140,170,0.85) 300deg, rgba(244,63,94,0.0) 360deg)',
+                            }}
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+                        />
+                        <motion.button
+                            type="button"
+                            onClick={handlePlanClick}
+                            disabled={isRouting}
+                            whileTap={!isRouting ? { scale: 0.98 } : {}}
+                            transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                            className="relative w-full overflow-hidden rounded-[18px] py-[18px] text-white font-bold text-[17px] flex items-center justify-center gap-2"
+                            style={{
+                                background: isAdventure
+                                    ? 'linear-gradient(135deg, rgba(217,119,6,0.98), rgba(249,115,22,0.94))'
+                                    : 'linear-gradient(135deg, rgba(225,29,72,0.98), rgba(244,63,94,0.94))',
+                                boxShadow: isAdventure
+                                    ? '0 12px 36px rgba(249,115,22,0.55), inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -10px 24px rgba(0,0,0,0.18)'
+                                    : '0 12px 36px rgba(244,63,94,0.55), inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -10px 24px rgba(0,0,0,0.18)',
+                                letterSpacing: '-0.015em',
+                                opacity: isRouting ? 0.7 : 1,
+                                cursor: isRouting ? 'not-allowed' : 'pointer',
+                            }}
+                        >
+                            {/* Top inner glint */}
+                            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+                            {/* Traveling shimmer */}
+                            <motion.div
+                                aria-hidden
+                                className="absolute inset-y-0 -left-1/3 w-1/3 pointer-events-none"
+                                style={{
+                                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                                    transform: 'skewX(-20deg)',
+                                }}
+                                animate={{ x: ['0%', '420%'] }}
+                                transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.4 }}
                             />
-                        )}
-                        <span className="relative z-10">
-                            {isRouting
-                                ? (isAdventure ? 'Finding your thrill ride…' : 'Calculating safest path…')
-                                : (isAdventure ? 'Plan Adventure Route' : 'Plan Safest Route')}
-                        </span>
-                    </motion.button>
+                            {/* Click ripple */}
+                            {ripple && (
+                                <span
+                                    className="absolute rounded-full bg-white/40 pointer-events-none animate-ping"
+                                    style={{ left: ripple.x - 22, top: ripple.y - 22, width: 44, height: 44 }}
+                                />
+                            )}
+                            <span className="relative z-10">
+                                {isRouting
+                                    ? (isAdventure ? 'Finding your thrill ride…' : 'Calculating safest path…')
+                                    : (isAdventure ? 'Plan Adventure Route' : 'Plan Safest Route')}
+                            </span>
+                            {!isRouting && (
+                                <motion.svg
+                                    className="relative z-10 w-4 h-4"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                                    animate={{ x: [0, 3, 0] }}
+                                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M13 7l5 5-5 5M5 12h12" />
+                                </motion.svg>
+                            )}
+                            {isRouting && (
+                                <span
+                                    aria-hidden
+                                    className="relative z-10 inline-block w-4 h-4 rounded-full border-2 border-white/80 border-r-transparent animate-spin"
+                                />
+                            )}
+                        </motion.button>
+                    </div>
 
                     {/* Adventure score chip */}
                     {routeTelemetry?.isAdventureMode && routeTelemetry?.adventureScore != null && (

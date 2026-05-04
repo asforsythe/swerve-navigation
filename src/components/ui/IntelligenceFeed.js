@@ -172,32 +172,71 @@ export default function IntelligenceFeed({ speak, userLoc }) {
 
   return (
     <>
-      {/* Floating toggle tab */}
-      <button
-        onClick={togglePanel}
-        className="absolute left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full border border-white/[0.1] transition-all duration-200 hover:border-violet-400/40 hover:bg-violet-500/10 active:scale-95"
-        style={{
-          bottom: 'calc(var(--safe-bottom, 0px) + 64px)',
-          background: show ? 'rgba(167,139,250,0.15)' : 'rgba(10,10,14,0.85)',
-          backdropFilter: 'blur(16px)',
-          boxShadow: show ? '0 0 20px rgba(167,139,250,0.2)' : '0 4px 20px rgba(0,0,0,0.4)',
-        }}
+      {/* Floating toggle tab — hero pill */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 z-40"
+        style={{ bottom: 'calc(var(--safe-bottom, 0px) + 64px)' }}
       >
-        <svg className={`w-3.5 h-3.5 ${show ? 'text-violet-400' : 'text-white/50'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span className={`text-[11px] font-semibold ${show ? 'text-violet-300' : 'text-white/50'}`}>
-          Intelligence Feed
-        </span>
+        {/* Pulse aura when there are unread items */}
         {unread > 0 && !show && (
-          <span className="w-4 h-4 bg-violet-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center animate-bounce">
-            {unread > 9 ? '9+' : unread}
-          </span>
+          <motion.div
+            aria-hidden
+            className="absolute -inset-2 rounded-full pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse at center, rgba(167,139,250,0.55), transparent 70%)',
+              filter: 'blur(10px)',
+            }}
+            animate={{ opacity: [0.45, 0.85, 0.45] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
         )}
-        <svg className={`w-3 h-3 text-white/30 transition-transform ${show ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+        <motion.button
+          onClick={togglePanel}
+          whileTap={{ scale: 0.94 }}
+          className="relative flex items-center gap-2 px-4 py-2 rounded-full overflow-hidden"
+          style={{
+            background: show
+              ? 'linear-gradient(135deg, rgba(167,139,250,0.22), rgba(167,139,250,0.12))'
+              : 'linear-gradient(135deg, rgba(15,15,22,0.95), rgba(8,8,12,0.95))',
+            border: `1px solid ${show ? 'rgba(167,139,250,0.50)' : 'rgba(255,255,255,0.10)'}`,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: show
+              ? '0 0 24px rgba(167,139,250,0.40), 0 8px 22px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.10)'
+              : '0 8px 22px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)',
+          }}
+        >
+          {/* Top hairline glint */}
+          <div className="absolute inset-x-0 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-violet-300/55 to-transparent pointer-events-none" />
+          <svg className={`w-3.5 h-3.5 ${show ? 'text-violet-300' : 'text-white/55'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className={`text-[11px] font-semibold tracking-tight ${show ? 'text-violet-200' : 'text-white/65'}`}>
+            Intelligence Feed
+          </span>
+          {unread > 0 && !show && (
+            <motion.span
+              className="w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center"
+              style={{
+                background: 'linear-gradient(135deg, #a78bfa, #c4b5fd)',
+                boxShadow: '0 0 10px rgba(167,139,250,0.7)',
+              }}
+              animate={{ scale: [1, 1.18, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              {unread > 9 ? '9+' : unread}
+            </motion.span>
+          )}
+          <motion.svg
+            className={`w-3 h-3 ${show ? 'text-violet-300' : 'text-white/40'}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            animate={{ rotate: show ? 180 : 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </motion.svg>
+        </motion.button>
+      </div>
 
       {/* Feed panel */}
       <AnimatePresence>
